@@ -1,1 +1,3 @@
-console.log('Hello World')
+import { config } from 'dotenv'
+import './services/http.js'
+config()
