@@ -1,4 +1,5 @@
 import express from 'express'
+import sendEmailTemplate from '../routes/email-templates.js'
 
 // Create a new express application instance.
 const app: express.Application = express()
@@ -13,6 +14,9 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept')
   next()
 })
+
+// Add POST route to send email template.
+app.post('/email/templates/:templateName', sendEmailTemplate)
 
 // Start the server.
 const PORT = 3000 || process.env.PORT
