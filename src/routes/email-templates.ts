@@ -38,6 +38,7 @@ const getTemplate = async (name: string): Promise<string | null> => {
     const templatePath = `${dataPath}/templates/${name}`
     return await readFile(templatePath, 'utf8')
   } catch (error) {
+    console.error(error)
     return null
   }
 }

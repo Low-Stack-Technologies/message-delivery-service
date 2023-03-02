@@ -9,12 +9,6 @@ const loadApiKeys = () => {
   // Check if there are no API keys.
   if (API_KEYS.length === 0) console.warn('No API keys found. Set the API_KEYS environment variable.')
 
-  // Check that all API keys are 64 characters long.
-  if (API_KEYS.some((key) => key.length !== 64)) {
-    console.error('All API keys must be 64 characters long.')
-    process.exit(1)
-  }
-
   // Check that all API keys are unique.
   if (API_KEYS.length !== new Set(API_KEYS).size) {
     console.error('All API keys must be unique.')
