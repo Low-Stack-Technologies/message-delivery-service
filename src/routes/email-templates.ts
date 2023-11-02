@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import { readFile } from 'fs/promises'
-import { sendEmail } from './../services/email.js'
+import { sendEmail } from './../services/email'
 
 /**
  * Send email template.

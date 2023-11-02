@@ -1,6 +1,6 @@
 import express from 'express'
-import checkApiKey from '../middleware/checkApiKey.js'
-import sendEmailTemplate from '../routes/email-templates.js'
+import checkApiKey from '../middleware/checkApiKey'
+import sendEmailTemplate from '../routes/email-templates'
 
 // Create a new express application instance.
 const app: express.Application = express()
