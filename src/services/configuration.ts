@@ -1,6 +1,6 @@
 import { existsSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
-import ConfigurationSchema, { type Configuration } from '../schemas/Configuration'
+import ConfigurationSchema, { type Configuration } from '../schemas/configuration/Configuration'
 import Log from './logging'
 
 export default class ConfigurationService {

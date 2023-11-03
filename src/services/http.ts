@@ -1,5 +1,7 @@
 import express, { type Application } from 'express'
 import cors from '../middleware/cors'
+import headersMiddleware from '../middleware/headers'
+import authenticateRoute from '../routes/authenticate'
 import ConfigurationService from './configuration'
 import Log from './logging'
 
@@ -20,7 +22,9 @@ export default class HttpService {
     HttpService.instance.use(cors)
   }
 
-  private static registerRoutes() {}
+  private static registerRoutes() {
+    HttpService.instance.post('/v2/authenticate', headersMiddleware({ 'content-type': 'application/json' }), authenticateRoute)
+  }
 
   private static start() {
     const port = ConfigurationService.get().http.port

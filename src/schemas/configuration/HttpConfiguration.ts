@@ -1,9 +1,15 @@
 import z from 'zod'
+import TokenService from '../../services/token'
 
 const HttpConfigurationSchema = z.object({
   port: z.number().default(3000),
 
   security: z.object({
+    token: z.object({
+      secret: z.string().default(TokenService.generateSecret()),
+      expiresIn: z.string().default('1h')
+    }),
+
     cors: z.object({
       enabled: z.boolean().default(true),
       origin: z.string().default('*'),
