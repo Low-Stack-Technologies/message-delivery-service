@@ -1,5 +1,6 @@
 import express, { type Application } from 'express'
 import cors from '../middleware/cors'
+import ConfigurationService from './configuration'
 import Log from './logging'
 
 export default class HttpService {
@@ -22,7 +23,7 @@ export default class HttpService {
   private static registerRoutes() {}
 
   private static start() {
-    const port = process.env.PORT || 3000
+    const port = ConfigurationService.get().http.port
     HttpService.instance.listen(port, () => {
       Log.info(`Server started on port ${port}`)
     })

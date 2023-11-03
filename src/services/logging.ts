@@ -30,9 +30,9 @@ export default class Log {
     })
   }
 
-  public static info = (message: string) => Log.instance.info(message)
-  public static error = (message: string) => Log.instance.error(message)
-  public static warn = (message: string) => Log.instance.warn(message)
-  public static debug = (message: string) => Log.instance.debug(message)
-  public static verbose = (message: string) => Log.instance.verbose(message)
+  public static info = (message?: string) => Log.instance.info(message ?? '[Recieved an undefined message]')
+  public static error = (message?: string) => Log.instance.error(message ?? '[Recieved an undefined message]')
+  public static warn = (message?: string) => Log.instance.warn(message ?? '[Recieved an undefined message]')
+  public static debug = (message?: string) => Log.instance.debug(message ?? '[Recieved an undefined message]')
+  public static verbose = (message?: string) => Log.instance.verbose(message ?? '[Recieved an undefined message]')
 }

@@ -1,6 +1,8 @@
 import 'dotenv/config'
+import ConfigurationService from './services/configuration'
 import HttpService from './services/http'
 import Log from './services/logging'
 
-HttpService.initialize()
 Log.initialize()
+await ConfigurationService.load()
+HttpService.initialize()
