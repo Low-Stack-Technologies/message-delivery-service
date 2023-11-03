@@ -1,5 +1,6 @@
 import express, { type Application } from 'express'
 import cors from '../middleware/cors'
+import Log from './logging'
 
 export default class HttpService {
   private static instance: Application
@@ -21,6 +22,9 @@ export default class HttpService {
   private static registerRoutes() {}
 
   private static start() {
-    HttpService.instance.listen(3000, () => console.log('Server is running on port 3000'))
+    const port = process.env.PORT || 3000
+    HttpService.instance.listen(port, () => {
+      Log.info(`Server started on port ${port}`)
+    })
   }
 }
