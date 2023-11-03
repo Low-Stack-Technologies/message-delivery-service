@@ -1,3 +1,1 @@
-import { config } from 'dotenv'
-import './services/http'
-config()
+import 'dotenv/config';
