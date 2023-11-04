@@ -37,6 +37,13 @@ const EmailBodySchema = z
 
     return true
   }, 'Invalid service')
+  .refine((data) => {
+    const emails = ConfigurationService.get().email
+    const email = emails.find((email) => email.auth.user === data.from.email)
+    if (!email) return false
+
+    return true
+  }, 'Invalid email')
 
 export type EmailBody = z.infer<typeof EmailBodySchema>
 
