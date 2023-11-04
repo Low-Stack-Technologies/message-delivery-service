@@ -13,11 +13,15 @@
 
 ```json
 {
-  "to": "{{PHONE NUMBER}}",
+  "to": {
+    "phone": "{{PHONE NUMBER}}",
+    "country": "{{COUNTRY CODE}}" // Two-letter country code
+  },
   "from": {
     "name": "{{NAME}}"
   },
 
+  "useTemplate": false,
   "body": "{{BODY}}"
 }
 ```

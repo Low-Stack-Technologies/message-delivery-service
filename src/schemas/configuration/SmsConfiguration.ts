@@ -5,7 +5,8 @@ const SmsConfigurationSchema = z.object({
 
   '46elks': z.object({
     username: z.string(),
-    password: z.string()
+    password: z.string(),
+    currency: z.string()
   })
 })
 

@@ -6,7 +6,7 @@ import fillTemplate from '../libs/fillTemplate'
 import ConfigurationService from './configuration'
 
 export default class EmailService {
-  private static DATA_PATH = process.env.DATA_PATH || './data/'
+  public static readonly DATA_PATH = process.env.DATA_PATH || './data/'
   private static transporters = new Map<string, Transporter>()
 
   public static initialize() {
