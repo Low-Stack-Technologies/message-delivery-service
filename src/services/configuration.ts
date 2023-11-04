@@ -118,7 +118,8 @@ export default class ConfigurationService {
         'provider': '46elks',
         '46elks': {
           username: '',
-          password: ''
+          password: '',
+          currency: ''
         }
       }
     }
