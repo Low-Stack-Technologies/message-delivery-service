@@ -13,7 +13,7 @@ const EmailBodySchema = z
 
     useTemplate: z.boolean(),
 
-    body: z.string(),
+    body: z.string().optional(),
     isHTML: z.boolean().default(true),
 
     template: z

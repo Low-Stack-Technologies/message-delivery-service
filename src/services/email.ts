@@ -1,7 +1,12 @@
+import { readFile } from 'fs/promises'
 import nodemailer, { type Transporter } from 'nodemailer'
+import path from 'path'
+import fileExists from '../libs/fileExists'
+import fillTemplate from '../libs/fillTemplate'
 import ConfigurationService from './configuration'
 
 export default class EmailService {
+  private static DATA_PATH = process.env.DATA_PATH || './data/'
   private static transporters = new Map<string, Transporter>()
 
   public static initialize() {
@@ -38,5 +43,18 @@ export default class EmailService {
       html: isHtml ? body : undefined,
       text: isHtml ? undefined : body
     })
+  }
+
+  public static async getTemplateBody(template: string, service: string, data: Record<string, string>) {
+    const templateBody = await EmailService.getTemplate(template, service)
+    return fillTemplate(templateBody, data)
+  }
+
+  private static async getTemplate(template: string, service: string) {
+    const templatePath = path.join(EmailService.DATA_PATH, `./templates/email/${service}/${template}.html`)
+    if (!(await fileExists(templatePath))) throw new Error(`Template ${template} not found`)
+    const templateBody = await readFile(templatePath, 'utf-8')
+
+    return templateBody
   }
 }
