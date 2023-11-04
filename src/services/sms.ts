@@ -5,8 +5,8 @@ import fileExists from '../libs/fileExists'
 import fillTemplate from '../libs/fillTemplate'
 import SmsResponseSchema from '../schemas/smsResponse'
 import ConfigurationService from './configuration'
-import EmailService from './email'
 import Log from './logging'
+import StorageService from './storage'
 
 export default class SmsService {
   public static parsePhoneNumber(phoneNumber: string, country: CountryCode): string | false {
@@ -58,7 +58,7 @@ export default class SmsService {
   }
 
   private static async getTemplate(template: string, service: string): Promise<string> {
-    const templatePath = path.join(EmailService.DATA_PATH, `./templates/sms/${service}/${template}.txt`)
+    const templatePath = path.join(StorageService.DATA_PATH, `./templates/sms/${service}/${template}.txt`)
     if (!(await fileExists(templatePath))) throw new Error(`Template ${template} not found`)
     const templateBody = await readFile(templatePath, 'utf-8')
 
