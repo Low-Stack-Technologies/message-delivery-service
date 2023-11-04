@@ -1,12 +1,17 @@
-FROM node:18
+FROM node:21-alpine
 
 WORKDIR /app
 
+VOLUME [ "/data" ]
+
+ENV DATA_PATH=/data
+ENV CONFIGURATION_FILE_PATH=/data/config.json
+
+RUN npm install -g pnpm
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
 COPY . .
 
-RUN npm install
-RUN npx tsc
-
-EXPOSE 3000
-
-CMD [ "node", "./dist/app.js" ]
+CMD [ "pnpm", "tsx", "./src/app.ts" ]

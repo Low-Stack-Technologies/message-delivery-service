@@ -1,29 +1,48 @@
-import express from 'express'
-import checkApiKey from '../middleware/checkApiKey'
-import sendEmailTemplate from '../routes/email-templates'
+import express, { type Application, type NextFunction, type Request, type Response } from 'express'
+import accessMiddleware from '../middleware/access'
+import authorizedMiddleware from '../middleware/authorized'
+import cors from '../middleware/cors'
+import headersMiddleware from '../middleware/headers'
+import authenticateRoute from '../routes/authenticate'
+import emailRoute from '../routes/email'
+import smsRoute from '../routes/sms'
+import ConfigurationService from './configuration'
+import Log from './logging'
 
-// Create a new express application instance.
-const app: express.Application = express()
+export default class HttpService {
+  private static instance: Application
 
-// Add middleware to parse the request body.
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+  public static initialize() {
+    HttpService.instance = express()
 
-// Add middleware to handle CORS.
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*')
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept')
-  next()
-})
+    HttpService.registerMiddlewares()
+    HttpService.registerRoutes()
 
-// Add middleware to check the API key.
-app.use(checkApiKey)
+    HttpService.start()
+  }
 
-// Add POST route to send email template.
-app.post('/email/templates/:templateName', sendEmailTemplate)
+  private static registerMiddlewares() {
+    HttpService.instance.use(accessMiddleware)
+    HttpService.instance.use(express.json())
+    HttpService.instance.use(cors)
+    HttpService.instance.use(HttpService.errorHandling)
+  }
 
-// Start the server.
-const PORT = 3000 || process.env.PORT
-app.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`)
-})
+  private static registerRoutes() {
+    HttpService.instance.post('/v2/authenticate', headersMiddleware({ 'content-type': 'application/json' }), authenticateRoute)
+    HttpService.instance.post('/v2/email', authorizedMiddleware, emailRoute)
+    HttpService.instance.post('/v2/sms', authorizedMiddleware, smsRoute)
+  }
+
+  private static start() {
+    const port = ConfigurationService.get().http.port
+    HttpService.instance.listen(port, () => {
+      Log.info(`Server started on port ${port}`)
+    })
+  }
+
+  private static errorHandling(err: Error, req: Request, res: Response, next: NextFunction) {
+    Log.error(`Unhandled error in Express route: ${err}`)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+}
