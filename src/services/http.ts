@@ -1,7 +1,9 @@
 import express, { type Application } from 'express'
+import authorizedMiddleware from '../middleware/authorized'
 import cors from '../middleware/cors'
 import headersMiddleware from '../middleware/headers'
 import authenticateRoute from '../routes/authenticate'
+import emailRoute from '../routes/email'
 import ConfigurationService from './configuration'
 import Log from './logging'
 
@@ -24,6 +26,7 @@ export default class HttpService {
 
   private static registerRoutes() {
     HttpService.instance.post('/v2/authenticate', headersMiddleware({ 'content-type': 'application/json' }), authenticateRoute)
+    HttpService.instance.post('/v2/email', authorizedMiddleware, emailRoute)
   }
 
   private static start() {

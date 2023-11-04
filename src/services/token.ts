@@ -13,6 +13,16 @@ export default class TokenService {
     return jwt.sign({ data: { service } }, TokenService.JWT_SECRET, { expiresIn: '1h' })
   }
 
+  public static validate(token: string): string | false {
+    try {
+      const payload = jwt.verify(token, TokenService.JWT_SECRET)
+      if (typeof payload === 'string') throw new Error('Invalid payload')
+      return payload.data.service
+    } catch (error) {
+      return false
+    }
+  }
+
   public static generateSecret(): string {
     return randomBytes(64).toString('hex')
   }
