@@ -5,6 +5,14 @@ export default class Log {
 
   public static initialize() {
     Log.instance = createLogger({
+      levels: {
+        access: 0,
+        info: 1,
+        error: 2,
+        warn: 3,
+        debug: 4,
+        verbose: 5
+      },
       level: 'debug',
       format: format.combine(
         format.timestamp({
@@ -12,6 +20,7 @@ export default class Log {
         }),
         format.colorize({
           colors: {
+            access: 'magenta',
             info: 'blue',
             error: 'red',
             warn: 'yellow',
@@ -23,6 +32,7 @@ export default class Log {
         format.printf((info) => `${info.timestamp} ${info.level}: ${info.message}`)
       ),
       transports: [
+        new transports.File({ filename: 'logs/access.log', level: 'access', format: format.uncolorize() }),
         new transports.File({ filename: 'logs/error.log', level: 'error', format: format.uncolorize() }),
         new transports.File({ filename: 'logs/combined.log', format: format.uncolorize() }),
         new transports.Console({ level: 'debug' })
@@ -30,6 +40,7 @@ export default class Log {
     })
   }
 
+  public static access = (message?: string) => Log.instance.log('access', message ?? '[Recieved an undefined message]')
   public static info = (message?: string) => Log.instance.info(message ?? '[Recieved an undefined message]')
   public static error = (message?: string) => Log.instance.error(message ?? '[Recieved an undefined message]')
   public static warn = (message?: string) => Log.instance.warn(message ?? '[Recieved an undefined message]')

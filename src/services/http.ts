@@ -1,4 +1,5 @@
-import express, { type Application } from 'express'
+import express, { type Application, type NextFunction, type Request, type Response } from 'express'
+import accessMiddleware from '../middleware/access'
 import authorizedMiddleware from '../middleware/authorized'
 import cors from '../middleware/cors'
 import headersMiddleware from '../middleware/headers'
@@ -20,8 +21,10 @@ export default class HttpService {
   }
 
   private static registerMiddlewares() {
+    HttpService.instance.use(accessMiddleware)
     HttpService.instance.use(express.json())
     HttpService.instance.use(cors)
+    HttpService.instance.use(HttpService.errorHandling)
   }
 
   private static registerRoutes() {
@@ -34,5 +37,10 @@ export default class HttpService {
     HttpService.instance.listen(port, () => {
       Log.info(`Server started on port ${port}`)
     })
+  }
+
+  private static errorHandling(err: Error, req: Request, res: Response, next: NextFunction) {
+    Log.error(`Unhandled error in Express route: ${err}`)
+    res.status(500).json({ message: 'Internal server error' })
   }
 }

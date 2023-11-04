@@ -9,7 +9,7 @@ const emailRoute = async (req: Request, res: Response) => {
   const validationResult = EmailBodySchema.safeParse(emailBody)
 
   if (!validationResult.success) {
-    Log.verbose(JSON.stringify(validationResult.error, null, 2))
+    Log.warn(`Invalid email request: ${validationResult.error.message}`)
 
     return res.status(400).json({
       success: false,

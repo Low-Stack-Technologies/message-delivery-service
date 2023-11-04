@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express'
+import Log from '../services/logging'
 
 const headersMiddleware = (requiredHeaders: { [key: string]: string }) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -7,6 +8,8 @@ const headersMiddleware = (requiredHeaders: { [key: string]: string }) => {
       .map(([header]) => header)
 
     if (missingHeaders.length > 0) {
+      Log.warn(`Missing required headers: ${missingHeaders.join(', ')}`)
+
       return res.status(400).json({
         error: 'Missing required headers',
         missingHeaders

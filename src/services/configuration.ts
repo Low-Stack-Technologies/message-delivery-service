@@ -2,6 +2,7 @@ import { existsSync } from 'fs'
 import { readFile, writeFile } from 'fs/promises'
 import ConfigurationSchema, { type Configuration } from '../schemas/configuration/Configuration'
 import Log from './logging'
+import TokenService from './token'
 
 export default class ConfigurationService {
   private static CONFIGURATION_FILE_PATH = process.env.CONFIGURATION_FILE_PATH || './config.json'
@@ -17,6 +18,7 @@ export default class ConfigurationService {
         const parsedContent = this.parseConfigurationFile(fileContent)
         this.validateConfiguration(parsedContent)
         this.instance = parsedContent
+        Log.info('Configuration loaded')
       }
     } catch (error) {
       Log.error(`Failed to load configuration: ${error}`)
@@ -74,6 +76,11 @@ export default class ConfigurationService {
             maxAttempts: 5,
             timeWindow: 10000,
             maxDelay: 10000
+          },
+
+          token: {
+            secret: TokenService.generateSecret(),
+            expiresIn: '1h'
           }
         }
       },
