@@ -1,6 +1,6 @@
 {
   "name": "message-delivery-service",
-  "version": "1.0.5",
+  "version": "2.3.2",
   "description": "",
   "type": "module",
   "main": "app.js",
