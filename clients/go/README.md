@@ -11,7 +11,7 @@ A robust Go client library for interacting with the Message Delivery Service, fe
 ## Installation
 
 ```bash
-go get github.com/esaiaswestberg/message-delivery-service/clients/go
+go get github.com/Low-Stack-Technologies/message-delivery-service/clients/go
 ```
 
 ## Usage
@@ -23,8 +23,8 @@ import (
 	"context"
 	"log"
 
-	mds "github.com/esaiaswestberg/message-delivery-service/clients/go"
-	"github.com/esaiaswestberg/message-delivery-service/clients/go/api"
+	mds "github.com/Low-Stack-Technologies/message-delivery-service/clients/go"
+	"github.com/Low-Stack-Technologies/message-delivery-service/clients/go/api"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 

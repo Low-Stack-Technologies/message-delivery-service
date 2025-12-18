@@ -1,4 +1,4 @@
-module github.com/esaiaswestberg/message-delivery-service/clients/go
+module github.com/Low-Stack-Technologies/message-delivery-service/clients/go
 
 go 1.25.5
 

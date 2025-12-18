@@ -15,7 +15,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/esaiaswestberg/message-delivery-service/clients/go/api"
+	"github.com/Low-Stack-Technologies/message-delivery-service/clients/go/api"
 	"golang.org/x/crypto/ssh"
 )
 

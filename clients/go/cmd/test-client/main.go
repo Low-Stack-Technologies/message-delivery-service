@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/esaiaswestberg/message-delivery-service/clients/go"
-	"github.com/esaiaswestberg/message-delivery-service/clients/go/api"
+	"github.com/Low-Stack-Technologies/message-delivery-service/clients/go"
+	"github.com/Low-Stack-Technologies/message-delivery-service/clients/go/api"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
