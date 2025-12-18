@@ -26,6 +26,11 @@ func NewMiddleware() func(http.Handler) http.Handler {
 
 			config.DebugLog("[DEBUG] Auth Attempt - ClientID: %s, Timestamp: %s, Auth: %s", clientID, timestampStr, authHeader)
 
+			if r.URL.Path == "/health" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			if clientID == "" || timestampStr == "" || authHeader == "" {
 				config.DebugLog("[DEBUG] Auth Failed - Missing headers")
 				http.Error(w, "Missing authentication headers", http.StatusUnauthorized)

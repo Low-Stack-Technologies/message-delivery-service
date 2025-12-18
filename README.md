@@ -14,6 +14,7 @@ A high-performance, secure, and extensible service for delivering transactional 
 
 - **[`/service`](./service)**: The core Go-based delivery service. Handles routing, authentication, and provider orchestration.
 - **[`/clients/go`](./clients/go)**: Official Go client library with automatic request signing.
+- **[`/clients/js`](./clients/js)**: Official TypeScript/JavaScript client library (`@lowstacktechnologies/mds-client`).
 - **[`/openapi.yaml`](./openapi.yaml)**: The source-of-truth API specification.
 - **[`/generate.sh`](./generate.sh)**: Utility script to synchronize code generators with the OpenAPI spec.
 
