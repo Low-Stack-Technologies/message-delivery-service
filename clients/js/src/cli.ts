@@ -57,7 +57,7 @@ async function main() {
         from: { address: senderEmail },
         to: recipientEmail,
         subject,
-        content: { body },
+        content: { body, isHtml: false },
       });
       console.log("✓ Success!", response.message);
     } catch (error) {

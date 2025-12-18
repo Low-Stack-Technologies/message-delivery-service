@@ -11,3 +11,14 @@ mkdir -p service/pkg/api
 oapi-codegen -package api -generate types,chi-server -o service/pkg/api/api.gen.go openapi.yaml
 
 echo "Successfully generated types in service/pkg/api/api.gen.go"
+
+# Generate Go Client
+mkdir -p clients/go/api
+oapi-codegen -package api -generate types,client -o clients/go/api/client.gen.go openapi.yaml
+echo "Successfully generated Go client in clients/go/api/client.gen.go"
+
+# Generate TS Client Types
+cd clients/js
+bunx openapi-typescript ../../openapi.yaml -o src/schema.ts
+echo "Successfully generated TS types in clients/js/src/schema.ts"
+cd ../..
