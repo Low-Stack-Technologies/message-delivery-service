@@ -3,6 +3,7 @@ package delivery
 import (
 	"crypto/tls"
 	"fmt"
+	"log"
 	"net/smtp"
 
 	"github.com/Low-Stack-Technologies/message-delivery-service/internal/config"
@@ -23,8 +24,11 @@ func NewEmailProvider(cfg *config.Config) *EmailProvider {
 func (p *EmailProvider) Send(from string, to []string, subject string, body string, isHTML bool) error {
 	acc, ok := p.accounts[from]
 	if !ok {
+		log.Printf("[DEBUG] Email Delivery Failed - No account for: %s", from)
 		return fmt.Errorf("no SMTP account configured for sender: %s", from)
 	}
+
+	log.Printf("[DEBUG] Email Delivery - Using SMTP account: %s (%s:%d)", acc.Address, acc.SMTP.Host, acc.SMTP.Port)
 
 	contentType := "text/plain"
 	if isHTML {
@@ -60,9 +64,36 @@ func (p *EmailProvider) Send(from string, to []string, subject string, body stri
 		if err = client.Auth(auth); err != nil {
 			return err
 		}
-		// ... (simplified for this draft, full implementation would handle recipients etc)
+
+		if err = client.Mail(from); err != nil {
+			return err
+		}
+		for _, addr := range to {
+			if err = client.Rcpt(addr); err != nil {
+				return err
+			}
+		}
+
+		w, err := client.Data()
+		if err != nil {
+			return err
+		}
+		_, err = w.Write([]byte(msg))
+		if err != nil {
+			return err
+		}
+		err = w.Close()
+		if err != nil {
+			return err
+		}
+
 		return client.Quit()
 	}
 
-	return smtp.SendMail(addr, auth, from, to, []byte(msg))
+	if err := smtp.SendMail(addr, auth, from, to, []byte(msg)); err != nil {
+		log.Printf("[DEBUG] Email Delivery Failed - SMTP Error: %v", err)
+		return err
+	}
+	log.Printf("[DEBUG] Email Delivery Success - Sent to %v", to)
+	return nil
 }

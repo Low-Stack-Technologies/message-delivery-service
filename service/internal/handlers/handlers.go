@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -75,14 +76,32 @@ func (h *Handler) PostV3Email(w http.ResponseWriter, r *http.Request, params api
 
 	// 3. Send
 	if err := h.email.Send(string(req.From.Address), addresses, req.Subject, body, isHTML); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Email send error: %v", err)
+		h.sendError(w, "DELIVERY_FAILED", err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(api.SuccessResponse{
 		Success: true,
 		Message: "Email accepted for delivery",
+	})
+}
+
+func (h *Handler) sendError(w http.ResponseWriter, code, message string, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(api.ErrorResponse{
+		Success: false,
+		Error: struct {
+			Code    string    `json:"code"`
+			Details *[]string `json:"details,omitempty"`
+			Message string    `json:"message"`
+		}{
+			Code:    code,
+			Message: message,
+		},
 	})
 }
 
@@ -128,10 +147,12 @@ func (h *Handler) PostV3Sms(w http.ResponseWriter, r *http.Request, params api.P
 
 	// 3. Send
 	if err := h.sms.Send(req.SenderName, numbers, body); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("SMS send error: %v", err)
+		h.sendError(w, "DELIVERY_FAILED", err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
 	json.NewEncoder(w).Encode(api.SuccessResponse{
 		Success: true,
