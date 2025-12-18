@@ -1,0 +1,16 @@
+# Ignore git directory
+.git
+
+# Ignore local config files
+service/config.yaml
+
+# Ignore temporary files
+service/tmp/
+.DS_Store
+
+# Ignore clients (not needed for service build)
+clients/
+
+# Ignore build artifacts provided they are in the root or service dir
+main
+service/main
