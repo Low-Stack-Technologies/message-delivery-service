@@ -25,7 +25,12 @@ Create a `config.yaml` file in the same directory. The service will generate a d
 
 The `config.yaml` file is the central source of truth and supports **hot-reloading**.
 
-### 1. Authorized Services (Signature Auth)
+### 1. General Settings
+```yaml
+debug: false # Set to true to enable verbose tracing in server logs
+```
+
+### 2. Authorized Services (Signature Auth)
 Every client using the API must be registered here with their Ed25519 public key.
 ```yaml
 services:

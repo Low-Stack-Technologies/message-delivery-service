@@ -3,7 +3,6 @@ package delivery
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
 	"net/smtp"
 
 	"github.com/Low-Stack-Technologies/message-delivery-service/internal/config"
@@ -24,11 +23,11 @@ func NewEmailProvider(cfg *config.Config) *EmailProvider {
 func (p *EmailProvider) Send(from string, to []string, subject string, body string, isHTML bool) error {
 	acc, ok := p.accounts[from]
 	if !ok {
-		log.Printf("[DEBUG] Email Delivery Failed - No account for: %s", from)
+		config.DebugLog("[DEBUG] Email Delivery Failed - No account for: %s", from)
 		return fmt.Errorf("no SMTP account configured for sender: %s", from)
 	}
 
-	log.Printf("[DEBUG] Email Delivery - Using SMTP account: %s (%s:%d)", acc.Address, acc.SMTP.Host, acc.SMTP.Port)
+	config.DebugLog("[DEBUG] Email Delivery - Using SMTP account: %s (%s:%d)", acc.Address, acc.SMTP.Host, acc.SMTP.Port)
 
 	contentType := "text/plain"
 	if isHTML {
@@ -91,9 +90,9 @@ func (p *EmailProvider) Send(from string, to []string, subject string, body stri
 	}
 
 	if err := smtp.SendMail(addr, auth, from, to, []byte(msg)); err != nil {
-		log.Printf("[DEBUG] Email Delivery Failed - SMTP Error: %v", err)
+		config.DebugLog("[DEBUG] Email Delivery Failed - SMTP Error: %v", err)
 		return err
 	}
-	log.Printf("[DEBUG] Email Delivery Success - Sent to %v", to)
+	config.DebugLog("[DEBUG] Email Delivery Success - Sent to %v", to)
 	return nil
 }

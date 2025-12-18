@@ -18,6 +18,8 @@ type Config struct {
 		Port int    `yaml:"port"`
 	} `yaml:"server"`
 
+	Debug bool `yaml:"debug"`
+
 	Services []ServiceConfig `yaml:"services"`
 
 	EmailAccounts []EmailAccountConfig `yaml:"email_accounts"`
@@ -58,6 +60,8 @@ const defaultConfig = `# Message Delivery Service Configuration
 server:
   host: "0.0.0.0"
   port: 3000
+
+debug: false
 
 # Service Authentication (Request Signing)
 # Each service that uses this API needs a unique ID and its Ed25519 public key.
@@ -105,6 +109,7 @@ func Load(path string) (*Config, error) {
 	currentConfig = &cfg
 	configMutex.Unlock()
 
+	DebugLog("[DEBUG] Config Loaded - Services: %d, Email Accounts: %d", len(cfg.Services), len(cfg.EmailAccounts))
 	return &cfg, nil
 }
 
@@ -132,6 +137,8 @@ func Watch(path string) error {
 					log.Printf("Config file modified: %s, reloading...", event.Name)
 					if _, err := Load(path); err != nil {
 						log.Printf("Error reloading config: %v", err)
+					} else {
+						DebugLog("[DEBUG] Config successfully reloaded")
 					}
 				}
 			case err, ok := <-watcher.Errors:
@@ -144,4 +151,12 @@ func Watch(path string) error {
 	}()
 
 	return watcher.Add(path)
+}
+
+func DebugLog(format string, v ...interface{}) {
+	configMutex.RLock()
+	defer configMutex.RUnlock()
+	if currentConfig != nil && currentConfig.Debug {
+		log.Printf(format, v...)
+	}
 }

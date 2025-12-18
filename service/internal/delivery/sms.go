@@ -21,7 +21,9 @@ func (p *SmsProvider) Send(from string, to []string, body string) error {
 	// 46elks implementation
 	apiURL := "https://api.46elks.com/a1/sms"
 
+	config.DebugLog("[DEBUG] SMS Delivery - Sending to %d recipients via 46elks", len(to))
 	for _, recipient := range to {
+		config.DebugLog("[DEBUG] SMS Delivery - Recipient: %s", recipient)
 		data := url.Values{}
 		data.Set("from", from)
 		data.Set("to", recipient)
@@ -42,8 +44,10 @@ func (p *SmsProvider) Send(from string, to []string, body string) error {
 		defer resp.Body.Close()
 
 		if resp.StatusCode >= 400 {
+			config.DebugLog("[DEBUG] SMS Delivery Failed - 46elks error: %s", resp.Status)
 			return fmt.Errorf("46elks API error: %s", resp.Status)
 		}
+		config.DebugLog("[DEBUG] SMS Delivery Success - Sent to %s", recipient)
 	}
 
 	return nil

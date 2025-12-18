@@ -10,7 +10,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -25,10 +24,10 @@ func NewMiddleware() func(http.Handler) http.Handler {
 			timestampStr := r.Header.Get("X-Timestamp")
 			authHeader := r.Header.Get("Authorization")
 
-			log.Printf("[DEBUG] Auth Attempt - ClientID: %s, Timestamp: %s, Auth: %s", clientID, timestampStr, authHeader)
+			config.DebugLog("[DEBUG] Auth Attempt - ClientID: %s, Timestamp: %s, Auth: %s", clientID, timestampStr, authHeader)
 
 			if clientID == "" || timestampStr == "" || authHeader == "" {
-				log.Printf("[DEBUG] Auth Failed - Missing headers")
+				config.DebugLog("[DEBUG] Auth Failed - Missing headers")
 				http.Error(w, "Missing authentication headers", http.StatusUnauthorized)
 				return
 			}
@@ -36,12 +35,12 @@ func NewMiddleware() func(http.Handler) http.Handler {
 			// 1. Verify Timestamp (Replay Protection)
 			timestamp, err := time.Parse(time.RFC3339, timestampStr)
 			if err != nil {
-				log.Printf("[DEBUG] Auth Failed - Invalid timestamp format: %v", err)
+				config.DebugLog("[DEBUG] Auth Failed - Invalid timestamp format: %v", err)
 				http.Error(w, "Invalid timestamp format", http.StatusBadRequest)
 				return
 			}
 			if time.Since(timestamp) > 5*time.Minute || time.Since(timestamp) < -5*time.Minute {
-				log.Printf("[DEBUG] Auth Failed - Timestamp expired: diff=%v", time.Since(timestamp))
+				config.DebugLog("[DEBUG] Auth Failed - Timestamp expired: diff=%v", time.Since(timestamp))
 				http.Error(w, "Request timestamp expired or in the future", http.StatusUnauthorized)
 				return
 			}
@@ -57,14 +56,14 @@ func NewMiddleware() func(http.Handler) http.Handler {
 			}
 
 			if service == nil {
-				log.Printf("[DEBUG] Auth Failed - Unknown Client ID: %s", clientID)
+				config.DebugLog("[DEBUG] Auth Failed - Unknown Client ID: %s", clientID)
 				http.Error(w, "Unknown Client ID", http.StatusUnauthorized)
 				return
 			}
 
 			pubKey, err := parsePublicKey(service.PublicKey)
 			if err != nil {
-				log.Printf("[DEBUG] Auth Failed - Public key parsing error: %v", err)
+				config.DebugLog("[DEBUG] Auth Failed - Public key parsing error: %v", err)
 				http.Error(w, "Service public key is misconfigured", http.StatusInternalServerError)
 				return
 			}
@@ -78,29 +77,29 @@ func NewMiddleware() func(http.Handler) http.Handler {
 
 			// Canonical = Method + "\n" + Path + "\n" + X-Timestamp + "\n" + SHA256(Body)
 			canonical := r.Method + "\n" + r.URL.Path + "\n" + timestampStr + "\n" + bodyHashHex
-			log.Printf("[DEBUG] Canonical Request:\n%s", canonical)
+			config.DebugLog("[DEBUG] Canonical Request:\n%s", canonical)
 
 			// 4. Verify Signature
 			if len(authHeader) < 10 || authHeader[:10] != "Signature " {
-				log.Printf("[DEBUG] Auth Failed - Invalid Auth header format")
+				config.DebugLog("[DEBUG] Auth Failed - Invalid Auth header format")
 				http.Error(w, "Invalid Authorization header format", http.StatusUnauthorized)
 				return
 			}
 			signatureB64 := authHeader[10:]
 			signature, err := base64.StdEncoding.DecodeString(signatureB64)
 			if err != nil {
-				log.Printf("[DEBUG] Auth Failed - Signature decode error: %v", err)
+				config.DebugLog("[DEBUG] Auth Failed - Signature decode error: %v", err)
 				http.Error(w, "Invalid signature encoding", http.StatusUnauthorized)
 				return
 			}
 
 			if !ed25519.Verify(pubKey, []byte(canonical), signature) {
-				log.Printf("[DEBUG] Auth Failed - Ed25519 verification failed")
+				config.DebugLog("[DEBUG] Auth Failed - Ed25519 verification failed")
 				http.Error(w, "Signature verification failed", http.StatusUnauthorized)
 				return
 			}
 
-			log.Printf("[DEBUG] Auth Success - ClientID: %s", clientID)
+			config.DebugLog("[DEBUG] Auth Success - ClientID: %s", clientID)
 			next.ServeHTTP(w, r)
 		})
 	}

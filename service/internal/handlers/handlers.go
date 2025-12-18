@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Low-Stack-Technologies/message-delivery-service/internal/config"
 	"github.com/Low-Stack-Technologies/message-delivery-service/internal/delivery"
 	"github.com/Low-Stack-Technologies/message-delivery-service/pkg/api"
 )
@@ -33,7 +34,9 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) PostV3Email(w http.ResponseWriter, r *http.Request, params api.PostV3EmailParams) {
 	var req api.EmailRequest
+	config.DebugLog("[DEBUG] PostV3Email - Decoding request body...")
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		config.DebugLog("[DEBUG] PostV3Email - Decode error: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -55,9 +58,11 @@ func (h *Handler) PostV3Email(w http.ResponseWriter, r *http.Request, params api
 	}
 
 	if len(addresses) == 0 {
+		config.DebugLog("[DEBUG] PostV3Email - No recipients extracted from: %+v", req.To)
 		http.Error(w, "No recipients specified", http.StatusBadRequest)
 		return
 	}
+	config.DebugLog("[DEBUG] PostV3Email - Recipients: %v", addresses)
 
 	// 2. Extract Content
 	var body string
@@ -107,7 +112,9 @@ func (h *Handler) sendError(w http.ResponseWriter, code, message string, status 
 
 func (h *Handler) PostV3Sms(w http.ResponseWriter, r *http.Request, params api.PostV3SmsParams) {
 	var req api.SmsRequest
+	config.DebugLog("[DEBUG] PostV3Sms - Decoding request body...")
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		config.DebugLog("[DEBUG] PostV3Sms - Decode error: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -131,9 +138,11 @@ func (h *Handler) PostV3Sms(w http.ResponseWriter, r *http.Request, params api.P
 	}
 
 	if len(numbers) == 0 {
+		config.DebugLog("[DEBUG] PostV3Sms - No recipients extracted from: %+v", req.To)
 		http.Error(w, "No recipients specified", http.StatusBadRequest)
 		return
 	}
+	config.DebugLog("[DEBUG] PostV3Sms - Recipients: %v", numbers)
 
 	// 2. Extract Content
 	var body string
