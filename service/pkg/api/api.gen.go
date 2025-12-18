@@ -21,7 +21,7 @@ const (
 
 // EmailContact defines model for EmailContact.
 type EmailContact struct {
-	Address openapi_types.Email `json:"addres"`
+	Address openapi_types.Email `json:"address"`
 	Name    *string             `json:"name,omitempty"`
 }
 
