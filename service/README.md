@@ -10,7 +10,7 @@ The service is available as a Docker image on `ghcr.io`.
 ```yaml
 services:
   mds:
-    image: ghcr.io/esaiaswestberg/message-delivery-service:latest
+    image: ghcr.io/low-stack-technologies/message-delivery-service:latest
     ports:
       - "3000:3000"
     volumes:
