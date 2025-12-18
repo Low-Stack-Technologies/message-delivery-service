@@ -65,7 +65,10 @@ This generates:
 - `mds_key.pub`: Your **Public Key** (OpenSSH format).
 
 ### 2. Prepare the Keys for Configuration
-- **Public Key**: Copy the content of `mds_key.pub` and add it to the `services` section of the Message Delivery Service `config.yaml`.
+- **Public Key**: You must Base64 encode the public key before adding it to the `services` section of the Message Delivery Service `config.yaml`:
+  ```bash
+  cat mds_key.pub | base64 -w 0
+  ```
 - **Private Key**: The client accepts the content of `mds_key` as a string. You can also Base64 encode it if you prefer to store it that way:
   ```bash
   cat mds_key | base64 -w 0

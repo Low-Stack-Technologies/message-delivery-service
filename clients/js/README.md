@@ -45,24 +45,33 @@ const smsResponse = await client.sendSms({
 });
 ```
 
-## Key Formats
+## Key Management
+
+The service uses Ed25519 signatures for authentication. You need a key pair to sign requests.
 
 The client supports multiple private key formats:
-
 - **Base64**: Raw 64-byte Ed25519 private key or 32-byte seed
 - **OpenSSH**: Keys generated with `ssh-keygen -t ed25519`
 - **Hex**: 64 or 128 character hex strings
 
-### Generating a Key Pair
-
+### 1. Generate an Ed25519 Key Pair
+The easiest way is using `ssh-keygen`:
 ```bash
 ssh-keygen -t ed25519 -f mds_key -N ""
 ```
+This generates:
+- `mds_key`: Your **Private Key** (OpenSSH format).
+- `mds_key.pub`: Your **Public Key** (OpenSSH format).
 
-Then encode the private key for use:
-```bash
-cat mds_key | base64 -w 0
-```
+### 2. Prepare the Keys for Configuration
+- **Public Key**: You must Base64 encode the public key before adding it to the `services` section of the Message Delivery Service `config.yaml`:
+  ```bash
+  cat mds_key.pub | base64 -w 0
+  ```
+- **Private Key**: The client accepts the content of `mds_key` as a string. You can also Base64 encode it if you prefer to store it that way:
+  ```bash
+  cat mds_key | base64 -w 0
+  ```
 
 ## CLI Test Utility
 
