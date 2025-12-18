@@ -1,0 +1,12 @@
+# Ignore git directory
+.git
+
+# Ignore local config files
+config.yaml
+
+# Ignore temporary files
+tmp/
+.DS_Store
+
+# Ignore build artifacts provided they are in the root
+main
