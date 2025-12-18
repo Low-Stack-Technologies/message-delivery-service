@@ -9,7 +9,7 @@
     "mds-cli": "dist/cli.js"
   },
   "scripts": {
-    "build": "bun build src/index.ts --outdir dist --target node && bun build src/cli.ts --outdir dist --target node",
+    "build": "bun build src/index.ts --outdir dist --target node && bun build src/cli.ts --outdir dist --target node && tsc --emitDeclarationOnly",
     "cli": "bun run src/cli.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -36,7 +36,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Low-Stack-Technologies/message-delivery-service.git",
+    "url": "git+https://github.com/Low-Stack-Technologies/message-delivery-service.git",
     "directory": "clients/js"
   }
 }
