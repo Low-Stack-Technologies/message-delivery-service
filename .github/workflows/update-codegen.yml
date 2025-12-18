@@ -33,8 +33,12 @@ jobs:
     - name: Generate Code
       run: ./generate.sh
 
-    - name: Commit and Push Changes
-      uses: stefanzweifel/git-auto-commit-action@v5
+    - name: Create Pull Request
+      uses: peter-evans/create-pull-request@v6
       with:
-        commit_message: "chore: update generated code"
+        commit-message: "chore: update generated code"
+        title: "chore: update generated code"
+        body: "This PR updates the generated API code based on the latest OpenAPI specification."
+        branch: "update-codegen"
+        base: "main"
 
