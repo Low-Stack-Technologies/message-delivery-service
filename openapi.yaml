@@ -1,0 +1,319 @@
+openapi: 3.0.3
+info:
+  title: Message Delivery Service
+  description: |
+    A robust service for sending emails and SMS messages. 
+    
+    ### Authentication: Request Signing
+    This API uses asymmetric request signing for top-tier security. Clients must sign every request using their **Private Key** (Ed25519) and provide the signature and metadata in headers.
+    
+    **How to sign a request:**
+    1. Construct a string to sign (the "Canonical Request"):
+       `Method + "\n" + Path + "\n" + X-Timestamp + "\n" + SHA256(Body)`
+    2. Sign this string using your private key.
+    3. Include the signature as a Base64-encoded string in the `Authorization` header.
+  version: 3.1.0
+servers:
+  - url: http://localhost:3000
+    description: Local Development Environment
+
+components:
+  securitySchemes:
+    signatureAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: |
+        Format: `Signature <base64_signature>`
+        Required alongside `X-Client-Id` and `X-Timestamp`.
+
+  parameters:
+    ClientIdHeader:
+      name: X-Client-Id
+      in: header
+      required: true
+      schema:
+        type: string
+      description: The unique ID assigned to your service.
+    TimestampHeader:
+      name: X-Timestamp
+      in: header
+      required: true
+      schema:
+        type: string
+        format: date-time
+      description: ISO 8601 timestamp. Requests older than 5 minutes will be rejected.
+
+  schemas:
+    # --- Error & Success ---
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              example: "SIGNATURE_INVALID"
+            message:
+              type: string
+              example: "The provided signature does not match the request content."
+            details:
+              type: array
+              items:
+                type: string
+              example: ["Check your canonical request construction"]
+
+    SuccessResponse:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully."
+        data:
+          type: object
+
+    # --- Email ---
+    EmailContact:
+      type: object
+      required: [address]
+      properties:
+        name:
+          type: string
+          example: "John Doe"
+        address:
+          type: string
+          format: email
+          example: "john.doe@example.com"
+
+    EmailRequest:
+      type: object
+      required: [to, from, subject]
+      properties:
+        to:
+          description: A single recipient or an array of recipients.
+          oneOf:
+            - type: string
+              format: email
+              example: "recipient@example.com"
+            - $ref: '#/components/schemas/EmailContact'
+            - type: array
+              items:
+                oneOf:
+                  - type: string
+                    format: email
+                  - $ref: '#/components/schemas/EmailContact'
+              example: ["one@example.com", "two@example.com"]
+        from:
+          $ref: '#/components/schemas/EmailContact'
+        subject:
+          type: string
+          example: "Welcome to our Service"
+        content:
+          type: object
+          oneOf:
+            - required: [body]
+              properties:
+                body:
+                  type: string
+                  example: "Hello, this is a plain text message."
+                isHtml:
+                  type: boolean
+                  default: false
+            - required: [template]
+              properties:
+                template:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name:
+                      type: string
+                      example: "welcome-email"
+                    data:
+                      type: object
+                      additionalProperties: true
+                      example:
+                        name: "John"
+
+    # --- SMS ---
+    SmsRecipient:
+      oneOf:
+        - type: string
+          description: Phone number in E.164 format.
+          example: "+46700000000"
+        - type: object
+          required: [phone, country]
+          properties:
+            phone:
+              type: string
+              example: "0700000000"
+            country:
+              type: string
+              minLength: 2
+              maxLength: 2
+              description: ISO 3166-1 alpha-2 country code.
+              example: "SE"
+
+    SmsRequest:
+      type: object
+      required: [to, senderName]
+      properties:
+        to:
+          description: A single recipient or an array of recipients.
+          oneOf:
+            - $ref: '#/components/schemas/SmsRecipient'
+            - type: array
+              items:
+                $ref: '#/components/schemas/SmsRecipient'
+              example: ["+46700000000", "+46700000001"]
+        senderName:
+          type: string
+          minLength: 3
+          maxLength: 11
+          example: "MyService"
+        content:
+          type: object
+          oneOf:
+            - required: [body]
+              properties:
+                body:
+                  type: string
+                  maxLength: 160
+                  example: "Your verification code is 1234."
+            - required: [template]
+              properties:
+                template:
+                  type: object
+                  required: [name, data]
+                  properties:
+                    name:
+                      type: string
+                      example: "otp-sms"
+                    data:
+                      type: object
+                      additionalProperties: true
+                      example:
+                        code: "1234"
+
+    SmsSuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            meta:
+              type: object
+              properties:
+                cost:
+                  type: number
+                  format: float
+                  example: 0.35
+                currency:
+                  type: string
+                  example: "SEK"
+
+security:
+  - signatureAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Service Health Check
+      description: Returns the status of the service and its dependencies.
+      security: [] # Public endpoint
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/email:
+    post:
+      summary: Send an Email
+      tags:
+        - Messaging
+      parameters:
+        - $ref: '#/components/parameters/ClientIdHeader'
+        - $ref: '#/components/parameters/TimestampHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailRequest'
+      responses:
+        '202':
+          description: Email accepted for delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/sms:
+    post:
+      summary: Send an SMS
+      tags:
+        - Messaging
+      parameters:
+        - $ref: '#/components/parameters/ClientIdHeader'
+        - $ref: '#/components/parameters/TimestampHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SmsRequest'
+      responses:
+        '202':
+          description: SMS accepted for delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmsSuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
