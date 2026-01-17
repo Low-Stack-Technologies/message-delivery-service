@@ -3,6 +3,7 @@ package delivery
 import (
 	"crypto/tls"
 	"fmt"
+	"mime"
 	"net/smtp"
 
 	"github.com/Low-Stack-Technologies/message-delivery-service/internal/config"
@@ -34,13 +35,15 @@ func (p *EmailProvider) Send(from string, to []string, subject string, body stri
 		contentType = "text/html"
 	}
 
+	encodedSubject := mime.QEncoding.Encode("utf-8", subject)
+
 	msg := fmt.Sprintf("From: %s\r\n"+
 		"To: %s\r\n"+
 		"Subject: %s\r\n"+
 		"MIME-Version: 1.0\r\n"+
 		"Content-Type: %s; charset=\"UTF-8\"\r\n"+
 		"\r\n"+
-		"%s", from, to[0], subject, contentType, body)
+		"%s", from, to[0], encodedSubject, contentType, body)
 
 	auth := smtp.PlainAuth("", acc.SMTP.Username, acc.SMTP.Password, acc.SMTP.Host)
 	addr := fmt.Sprintf("%s:%d", acc.SMTP.Host, acc.SMTP.Port)
