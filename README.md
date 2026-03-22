@@ -22,7 +22,14 @@ A high-performance, secure, and extensible service for delivering transactional 
 
 1. **Deploy the Service**: Check the [Service README](./service/README.md) for Docker Compose setup.
 2. **Configure Backends**: Add your SMTP and SMS provider credentials to `config.yaml`.
-3. **Integrate your App**: Use the [Go Client](./clients/go/README.md) for seamless integration.
+3. **Generate a Keypair**: Run the one-liner below to generate an Ed25519 keypair for request signing.
+4. **Integrate your App**: Use the [Go Client](./clients/go/README.md) for seamless integration.
+
+### Generate a Keypair
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Low-Stack-Technologies/message-delivery-service/refs/heads/main/generate-keypair.sh | bash
+```
 
 ## Development
 
