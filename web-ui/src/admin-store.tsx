@@ -27,11 +27,13 @@ import {
   type AdminEmailAccount,
   type AdminMessage,
   type AdminService,
+  type AdminServiceEmailAccessMode,
   type AdminSmsCredentials,
 } from "./admin-api";
 import { useAdminAuth } from "./auth";
 
 export type ServiceScope = "all" | "email" | "sms";
+export type ServiceEmailAccessMode = AdminServiceEmailAccessMode;
 export type ServiceStatus = "active" | "paused";
 export type EmailAccountStatus = "healthy" | "warning" | "offline";
 export type ActivityTone = "info" | "success" | "warning" | "danger";
@@ -76,6 +78,14 @@ type Action =
   | {
       type: "service/set-scope";
       payload: { id: string; scope: ServiceScope };
+    }
+  | {
+      type: "service/set-email-access";
+      payload: {
+        id: string;
+        emailAccessMode: ServiceEmailAccessMode;
+        allowedEmailAccountIds: string[];
+      };
     }
   | {
       type: "email/add";
@@ -205,7 +215,6 @@ export function AdminStoreProvider({ children }: { children: ReactNode }) {
         case "service/add":
           await createAdminService(token, {
             ...action.payload,
-            owner: action.payload.owner,
           });
           break;
         case "service/delete":
@@ -222,6 +231,12 @@ export function AdminStoreProvider({ children }: { children: ReactNode }) {
         case "service/set-scope":
           await updateAdminService(token, action.payload.id, {
             scope: action.payload.scope,
+          });
+          break;
+        case "service/set-email-access":
+          await updateAdminService(token, action.payload.id, {
+            emailAccessMode: action.payload.emailAccessMode,
+            allowedEmailAccountIds: action.payload.allowedEmailAccountIds,
           });
           break;
         case "email/add":

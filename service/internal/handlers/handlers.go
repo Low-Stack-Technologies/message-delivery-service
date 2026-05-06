@@ -89,8 +89,15 @@ func (h *Handler) PostV3Email(w http.ResponseWriter, r *http.Request, params api
 		}
 	}
 
+	snapshot := h.store.Snapshot()
+	sender, err := resolveEmailSender(snapshot.Config, string(params.XClientId), string(req.From.Address))
+	if err != nil {
+		h.sendError(w, "FORBIDDEN", err.Error(), http.StatusForbidden)
+		return
+	}
+
 	// 3. Send
-	if err := h.email.Send(string(req.From.Address), addresses, req.Subject, body, isHTML); err != nil {
+	if err := h.email.Send(sender, addresses, req.Subject, body, isHTML); err != nil {
 		log.Printf("Email send error: %v", err)
 		h.sendError(w, "DELIVERY_FAILED", err.Error(), http.StatusInternalServerError)
 		return

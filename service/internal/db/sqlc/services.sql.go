@@ -20,21 +20,22 @@ func (q *Queries) DeleteAllServices(ctx context.Context) error {
 }
 
 const insertService = `-- name: InsertService :exec
-INSERT INTO services (id, name, owner, scope, status, public_key, notes, created_at, last_reroll_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO services (id, name, owner, scope, email_access_mode, status, public_key, notes, created_at, last_reroll_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertServiceParams struct {
-	ID           string     `json:"id"`
-	Name         string     `json:"name"`
-	Owner        string     `json:"owner"`
-	Scope        string     `json:"scope"`
-	Status       string     `json:"status"`
-	PublicKey    string     `json:"public_key"`
-	Notes        string     `json:"notes"`
-	CreatedAt    time.Time  `json:"created_at"`
-	LastRerollAt *time.Time `json:"last_reroll_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Owner           string     `json:"owner"`
+	Scope           string     `json:"scope"`
+	EmailAccessMode string     `json:"email_access_mode"`
+	Status          string     `json:"status"`
+	PublicKey       string     `json:"public_key"`
+	Notes           string     `json:"notes"`
+	CreatedAt       time.Time  `json:"created_at"`
+	LastRerollAt    *time.Time `json:"last_reroll_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 func (q *Queries) InsertService(ctx context.Context, arg InsertServiceParams) error {
@@ -43,6 +44,7 @@ func (q *Queries) InsertService(ctx context.Context, arg InsertServiceParams) er
 		arg.Name,
 		arg.Owner,
 		arg.Scope,
+		arg.EmailAccessMode,
 		arg.Status,
 		arg.PublicKey,
 		arg.Notes,
@@ -54,25 +56,40 @@ func (q *Queries) InsertService(ctx context.Context, arg InsertServiceParams) er
 }
 
 const listServices = `-- name: ListServices :many
-SELECT id, name, owner, scope, status, public_key, notes, created_at, last_reroll_at, updated_at
+SELECT id, name, owner, scope, email_access_mode, status, public_key, notes, created_at, last_reroll_at, updated_at
 FROM services
 ORDER BY created_at DESC, id ASC
 `
 
-func (q *Queries) ListServices(ctx context.Context) ([]Service, error) {
+type ListServicesRow struct {
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Owner           string     `json:"owner"`
+	Scope           string     `json:"scope"`
+	EmailAccessMode string     `json:"email_access_mode"`
+	Status          string     `json:"status"`
+	PublicKey       string     `json:"public_key"`
+	Notes           string     `json:"notes"`
+	CreatedAt       time.Time  `json:"created_at"`
+	LastRerollAt    *time.Time `json:"last_reroll_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+func (q *Queries) ListServices(ctx context.Context) ([]ListServicesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listServices)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Service
+	var items []ListServicesRow
 	for rows.Next() {
-		var i Service
+		var i ListServicesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
 			&i.Owner,
 			&i.Scope,
+			&i.EmailAccessMode,
 			&i.Status,
 			&i.PublicKey,
 			&i.Notes,

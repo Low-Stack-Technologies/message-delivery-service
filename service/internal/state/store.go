@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -184,6 +185,10 @@ func (s *Store) loadConfig(ctx context.Context) (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	serviceEmailAccounts, err := s.q.ListServiceEmailAccounts(ctx)
+	if err != nil {
+		return nil, err
+	}
 	emailAccounts, err := s.q.ListEmailAccounts(ctx)
 	if err != nil {
 		return nil, err
@@ -199,17 +204,23 @@ func (s *Store) loadConfig(ctx context.Context) (*config.Config, error) {
 	cfg.Debug = settings.Debug
 	cfg.AdminBearerToken = settings.AdminBearerToken
 	cfg.Services = make([]config.ServiceConfig, 0, len(services))
+	allowedEmailIDsByService := make(map[string][]string)
+	for _, row := range serviceEmailAccounts {
+		allowedEmailIDsByService[row.ServiceID] = append(allowedEmailIDsByService[row.ServiceID], row.EmailAccountID)
+	}
 	for _, service := range services {
 		cfg.Services = append(cfg.Services, config.ServiceConfig{
-			ID:           service.ID,
-			Name:         service.Name,
-			Owner:        service.Owner,
-			Scope:        service.Scope,
-			Status:       service.Status,
-			PublicKey:    service.PublicKey,
-			Notes:        service.Notes,
-			CreatedAt:    service.CreatedAt,
-			LastRerollAt: service.LastRerollAt,
+			ID:                     service.ID,
+			Name:                   service.Name,
+			Owner:                  service.Owner,
+			Scope:                  service.Scope,
+			EmailAccessMode:        service.EmailAccessMode,
+			AllowedEmailAccountIDs: append([]string(nil), allowedEmailIDsByService[service.ID]...),
+			Status:                 service.Status,
+			PublicKey:              service.PublicKey,
+			Notes:                  service.Notes,
+			CreatedAt:              service.CreatedAt,
+			LastRerollAt:           service.LastRerollAt,
 		})
 	}
 	cfg.EmailAccounts = make([]config.EmailAccountConfig, 0, len(emailAccounts))
@@ -277,22 +288,22 @@ func (s *Store) persistConfig(ctx context.Context, cfg *config.Config) error {
 	}
 	for _, service := range cfg.Services {
 		if err := q.InsertService(ctx, sqlcdb.InsertServiceParams{
-			ID:           service.ID,
-			Name:         service.Name,
-			Owner:        service.Owner,
-			Scope:        normalizeServiceScope(service.Scope),
-			Status:       normalizeServiceStatus(service.Status),
-			PublicKey:    service.PublicKey,
-			Notes:        service.Notes,
-			CreatedAt:    service.CreatedAt,
-			LastRerollAt: service.LastRerollAt,
-			UpdatedAt:    now,
+			ID:              service.ID,
+			Name:            service.Name,
+			Owner:           service.Owner,
+			Scope:           normalizeServiceScope(service.Scope),
+			EmailAccessMode: normalizeEmailAccessMode(service.EmailAccessMode),
+			Status:          normalizeServiceStatus(service.Status),
+			PublicKey:       service.PublicKey,
+			Notes:           service.Notes,
+			CreatedAt:       service.CreatedAt,
+			LastRerollAt:    service.LastRerollAt,
+			UpdatedAt:       now,
 		}); err != nil {
 			_ = tx.Rollback()
 			return err
 		}
 	}
-
 	if err := q.DeleteAllEmailAccounts(ctx); err != nil {
 		_ = tx.Rollback()
 		return err
@@ -315,6 +326,31 @@ func (s *Store) persistConfig(ctx context.Context, cfg *config.Config) error {
 		}); err != nil {
 			_ = tx.Rollback()
 			return err
+		}
+	}
+
+	if err := q.DeleteAllServiceEmailAccounts(ctx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	emailAccountIDs := make(map[string]struct{}, len(cfg.EmailAccounts))
+	for _, account := range cfg.EmailAccounts {
+		emailAccountIDs[account.ID] = struct{}{}
+	}
+	for _, service := range cfg.Services {
+		for _, accountID := range service.AllowedEmailAccountIDs {
+			if _, ok := emailAccountIDs[accountID]; !ok {
+				_ = tx.Rollback()
+				return fmt.Errorf("service %q references unknown email account %q", service.ID, accountID)
+			}
+			if err := q.InsertServiceEmailAccount(ctx, sqlcdb.InsertServiceEmailAccountParams{
+				ServiceID:      service.ID,
+				EmailAccountID: accountID,
+				CreatedAt:      now,
+			}); err != nil {
+				_ = tx.Rollback()
+				return err
+			}
 		}
 	}
 
@@ -480,6 +516,9 @@ func cloneConfig(cfg *config.Config) *config.Config {
 
 	out := *cfg
 	out.Services = append([]config.ServiceConfig(nil), cfg.Services...)
+	for i := range out.Services {
+		out.Services[i].AllowedEmailAccountIDs = append([]string(nil), cfg.Services[i].AllowedEmailAccountIDs...)
+	}
 	out.EmailAccounts = append([]config.EmailAccountConfig(nil), cfg.EmailAccounts...)
 	return &out
 }
@@ -488,6 +527,17 @@ func normalizeServiceScope(scope string) string {
 	switch strings.ToLower(strings.TrimSpace(scope)) {
 	case "email", "sms", "all":
 		return strings.ToLower(strings.TrimSpace(scope))
+	case "":
+		return "all"
+	default:
+		return "all"
+	}
+}
+
+func normalizeEmailAccessMode(mode string) string {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "all", "restricted":
+		return strings.ToLower(strings.TrimSpace(mode))
 	case "":
 		return "all"
 	default:

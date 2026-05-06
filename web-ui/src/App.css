@@ -415,6 +415,38 @@
   gap: 14px;
 }
 
+.stacked-cell {
+  display: grid;
+  gap: 10px;
+}
+
+.choice-list {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.choice-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 13px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.choice-item input {
+  margin-top: 2px;
+}
+
+.choice-item span {
+  display: grid;
+  gap: 2px;
+}
+
 .form-actions {
   padding-top: 4px;
 }

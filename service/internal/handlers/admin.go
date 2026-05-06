@@ -91,8 +91,8 @@ func (h *Handler) CreateAdminUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, api.AdminUserCreateResponse{
-		Success:     true,
-		User:        user,
+		Success: true,
+		User:    user,
 		Credentials: api.AdminUserCredentials{
 			Password:        creds.Password,
 			ProvisioningUri: creds.ProvisioningURI,
@@ -188,16 +188,23 @@ func (h *Handler) CreateAdminService(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		allowedIDs := normalizeEmailAccountIDList(req.AllowedEmailAccountIds)
+		if err := validateAllowedEmailAccountIDs(cfg.EmailAccounts, allowedIDs); err != nil {
+			return err
+		}
+
 		cfg.Services = append(cfg.Services, config.ServiceConfig{
-			ID:           req.Id,
-			Name:         req.Name,
-			Owner:        stringValue(req.Owner),
-			Scope:        string(req.Scope),
-			Status:       string(req.Status),
-			PublicKey:    req.PublicKey,
-			Notes:        stringValue(req.Notes),
-			CreatedAt:    now,
-			LastRerollAt: nil,
+			ID:                     req.Id,
+			Name:                   req.Name,
+			Owner:                  stringValue(req.Owner),
+			Scope:                  string(req.Scope),
+			EmailAccessMode:        serviceEmailAccessModeValue(req.EmailAccessMode),
+			AllowedEmailAccountIDs: allowedIDs,
+			Status:                 string(req.Status),
+			PublicKey:              req.PublicKey,
+			Notes:                  stringValue(req.Notes),
+			CreatedAt:              now,
+			LastRerollAt:           nil,
 		})
 		return nil
 	})
@@ -258,6 +265,16 @@ func (h *Handler) UpdateAdminService(w http.ResponseWriter, r *http.Request, ser
 			}
 			if req.Scope != nil {
 				cfg.Services[i].Scope = string(*req.Scope)
+			}
+			if req.EmailAccessMode != nil {
+				cfg.Services[i].EmailAccessMode = string(*req.EmailAccessMode)
+			}
+			if req.AllowedEmailAccountIds != nil {
+				allowedIDs := normalizeEmailAccountIDList(req.AllowedEmailAccountIds)
+				if err := validateAllowedEmailAccountIDs(cfg.EmailAccounts, allowedIDs); err != nil {
+					return err
+				}
+				cfg.Services[i].AllowedEmailAccountIDs = allowedIDs
 			}
 			if req.Status != nil {
 				cfg.Services[i].Status = string(*req.Status)
@@ -511,6 +528,9 @@ func (h *Handler) UpdateAdminEmailAccount(w http.ResponseWriter, r *http.Request
 
 func (h *Handler) DeleteAdminEmailAccount(w http.ResponseWriter, r *http.Request, accountId string) {
 	err := h.store.UpdateConfig(func(cfg *config.Config) error {
+		for i := range cfg.Services {
+			cfg.Services[i].AllowedEmailAccountIDs = filterStringList(cfg.Services[i].AllowedEmailAccountIDs, accountId)
+		}
 		for i := range cfg.EmailAccounts {
 			if cfg.EmailAccounts[i].ID == accountId {
 				cfg.EmailAccounts = append(cfg.EmailAccounts[:i], cfg.EmailAccounts[i+1:]...)
@@ -666,7 +686,8 @@ func (h *Handler) CreateAdminMessage(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC()
 	requestJSON, _ := json.Marshal(req)
-	rendered, warnings, sender, subject, body, templateName, err := renderAdminMessage(req)
+	snapshot := h.store.Snapshot()
+	rendered, warnings, sender, subject, body, templateName, err := renderAdminMessage(snapshot.Config, req)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
 		return
@@ -712,7 +733,8 @@ func (h *Handler) PreviewAdminMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rendered, warnings, _, _, _, _, err := renderAdminMessage(req)
+	snapshot := h.store.Snapshot()
+	rendered, warnings, _, _, _, _, err := renderAdminMessage(snapshot.Config, req)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
 		return
@@ -732,7 +754,7 @@ func (h *Handler) PreviewAdminMessage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func renderAdminMessage(req api.AdminMessageRequest) (string, *[]string, string, *string, *string, *string, error) {
+func renderAdminMessage(cfg *config.Config, req api.AdminMessageRequest) (string, *[]string, string, *string, *string, *string, error) {
 	warnings := make([]string, 0, 2)
 	sender := ""
 	subject := req.Subject
@@ -741,25 +763,15 @@ func renderAdminMessage(req api.AdminMessageRequest) (string, *[]string, string,
 
 	switch req.Channel {
 	case api.AdminMessageChannelEmail:
+		var from string
 		if req.From != nil {
-			sender = string(*req.From)
-		} else {
-			snapshot := config.Get()
-			if snapshot != nil {
-				for _, account := range snapshot.EmailAccounts {
-					if account.IsDefault {
-						sender = account.Address
-						break
-					}
-				}
-				if sender == "" && len(snapshot.EmailAccounts) > 0 {
-					sender = snapshot.EmailAccounts[0].Address
-				}
-			}
+			from = string(*req.From)
 		}
-		if sender == "" {
-			return "", nil, "", nil, nil, nil, fmt.Errorf("email sender is required")
+		resolved, err := resolveEmailSender(cfg, req.ServiceId, from)
+		if err != nil {
+			return "", nil, "", nil, nil, nil, err
 		}
+		sender = resolved
 		if subject == nil || *subject == "" {
 			warnings = append(warnings, "Email subject is empty.")
 		}
@@ -843,16 +855,20 @@ func serviceToAPI(service config.ServiceConfig) api.AdminService {
 		createdAt = time.Now().UTC()
 	}
 
+	allowedEmailAccountIds := append([]string{}, service.AllowedEmailAccountIDs...)
+
 	return api.AdminService{
-		Id:           service.ID,
-		Name:         service.Name,
-		Owner:        stringPtrIfNotEmpty(service.Owner),
-		Scope:        api.AdminServiceScope(serviceScope(service.Scope)),
-		Status:       api.AdminServiceStatus(serviceStatus(service.Status)),
-		PublicKey:    service.PublicKey,
-		Notes:        stringPtrIfNotEmpty(service.Notes),
-		CreatedAt:    &createdAt,
-		LastRerollAt: service.LastRerollAt,
+		AllowedEmailAccountIds: allowedEmailAccountIds,
+		CreatedAt:              &createdAt,
+		EmailAccessMode:        api.AdminServiceEmailAccessMode(serviceEmailAccessMode(service.EmailAccessMode)),
+		Id:                     service.ID,
+		LastRerollAt:           service.LastRerollAt,
+		Name:                   service.Name,
+		Notes:                  stringPtrIfNotEmpty(service.Notes),
+		Owner:                  stringPtrIfNotEmpty(service.Owner),
+		PublicKey:              service.PublicKey,
+		Scope:                  api.AdminServiceScope(serviceScope(service.Scope)),
+		Status:                 api.AdminServiceStatus(serviceStatus(service.Status)),
 	}
 }
 
@@ -912,6 +928,17 @@ func (h *Handler) getEmailAccount(id string) (api.AdminEmailAccount, bool) {
 func serviceScope(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "email", "sms", "all":
+		return strings.ToLower(strings.TrimSpace(value))
+	case "":
+		return "all"
+	default:
+		return "all"
+	}
+}
+
+func serviceEmailAccessMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "all", "restricted":
 		return strings.ToLower(strings.TrimSpace(value))
 	case "":
 		return "all"
@@ -995,6 +1022,128 @@ func anyDefaultEmail(accounts []config.EmailAccountConfig) bool {
 		}
 	}
 	return false
+}
+
+func resolveEmailSender(cfg *config.Config, serviceID, requestedFrom string) (string, error) {
+	if cfg == nil {
+		return "", fmt.Errorf("configuration snapshot is not available")
+	}
+
+	var service *config.ServiceConfig
+	for i := range cfg.Services {
+		if cfg.Services[i].ID == serviceID {
+			service = &cfg.Services[i]
+			break
+		}
+	}
+	if service == nil {
+		return "", fmt.Errorf("service not found")
+	}
+	if serviceScope(service.Scope) == "sms" {
+		return "", fmt.Errorf("service is not allowed to send email")
+	}
+
+	if requestedFrom != "" {
+		var selected *config.EmailAccountConfig
+		for i := range cfg.EmailAccounts {
+			if cfg.EmailAccounts[i].Address == requestedFrom {
+				selected = &cfg.EmailAccounts[i]
+				break
+			}
+		}
+		if selected == nil {
+			return "", fmt.Errorf("email account %q is not configured", requestedFrom)
+		}
+		if serviceEmailAccessMode(service.EmailAccessMode) == "restricted" {
+			allowed := false
+			for _, accountID := range service.AllowedEmailAccountIDs {
+				if accountID == selected.ID {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return "", fmt.Errorf("service does not have access to email account %q", requestedFrom)
+			}
+		}
+		return requestedFrom, nil
+	}
+
+	if serviceEmailAccessMode(service.EmailAccessMode) == "restricted" {
+		for _, accountID := range service.AllowedEmailAccountIDs {
+			for _, account := range cfg.EmailAccounts {
+				if account.ID == accountID {
+					return account.Address, nil
+				}
+			}
+		}
+		return "", fmt.Errorf("service has no allowed email accounts")
+	}
+
+	for _, account := range cfg.EmailAccounts {
+		if account.IsDefault {
+			return account.Address, nil
+		}
+	}
+	if len(cfg.EmailAccounts) > 0 {
+		return cfg.EmailAccounts[0].Address, nil
+	}
+	return "", fmt.Errorf("no SMTP account configured")
+}
+
+func validateAllowedEmailAccountIDs(emailAccounts []config.EmailAccountConfig, allowedIDs []string) error {
+	if len(allowedIDs) == 0 {
+		return nil
+	}
+
+	allowed := make(map[string]struct{}, len(emailAccounts))
+	for _, account := range emailAccounts {
+		allowed[account.ID] = struct{}{}
+	}
+	for _, accountID := range allowedIDs {
+		if _, ok := allowed[accountID]; !ok {
+			return fmt.Errorf("unknown email account %q", accountID)
+		}
+	}
+	return nil
+}
+
+func normalizeEmailAccountIDList(ids *[]string) []string {
+	if ids == nil {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(*ids))
+	out := make([]string, 0, len(*ids))
+	for _, id := range *ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
+func filterStringList(values []string, remove string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if value != remove {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func serviceEmailAccessModeValue(mode *api.AdminServiceEmailAccessMode) string {
+	if mode == nil {
+		return "all"
+	}
+	return serviceEmailAccessMode(string(*mode))
 }
 
 func pemPrivateKey(key ed25519.PrivateKey) (string, error) {

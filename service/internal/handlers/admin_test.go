@@ -6,12 +6,12 @@ import (
 	"crypto/ed25519"
 	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base32"
 	"encoding/base64"
-	"encoding/json"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -113,18 +113,27 @@ func TestAdminRoutes_WorkAgainstSQLiteStore(t *testing.T) {
 		t.Fatalf("expected 1 queued message, got %d", dashboard.Summary.QueuedMessages)
 	}
 
+	restrictedMode := api.Restricted
 	createServiceReq := api.AdminServiceCreateRequest{
-		Id:        "reports-api",
-		Name:      "Reports API",
-		Owner:     stringPtr("Analytics"),
-		PublicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIReportsApiExampleKey",
-		Scope:     api.AdminServiceScopeAll,
-		Status:    api.Active,
-		Notes:     stringPtr("Reporting consumer"),
+		AllowedEmailAccountIds: &[]string{"support"},
+		EmailAccessMode:        &restrictedMode,
+		Id:                     "reports-api",
+		Name:                   "Reports API",
+		Owner:                  stringPtr("Analytics"),
+		PublicKey:              "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIReportsApiExampleKey",
+		Scope:                  api.AdminServiceScopeAll,
+		Status:                 api.Active,
+		Notes:                  stringPtr("Reporting consumer"),
 	}
 	createServiceResp := decodeAdminServiceResponse(t, doRequestJSON(t, router, http.MethodPost, "/v3/admin/services", token, createServiceReq))
 	if createServiceResp.Service.Id != "reports-api" {
 		t.Fatalf("unexpected service id: %q", createServiceResp.Service.Id)
+	}
+	if createServiceResp.Service.EmailAccessMode != api.Restricted {
+		t.Fatalf("unexpected email access mode: %s", createServiceResp.Service.EmailAccessMode)
+	}
+	if len(createServiceResp.Service.AllowedEmailAccountIds) != 1 || createServiceResp.Service.AllowedEmailAccountIds[0] != "support" {
+		t.Fatalf("unexpected allowed accounts: %#v", createServiceResp.Service.AllowedEmailAccountIds)
 	}
 
 	updateName := "Reports Platform"
@@ -139,6 +148,12 @@ func TestAdminRoutes_WorkAgainstSQLiteStore(t *testing.T) {
 	}
 	if updateServiceResp.Service.Status != api.Paused {
 		t.Fatalf("unexpected service status: %s", updateServiceResp.Service.Status)
+	}
+	if updateServiceResp.Service.EmailAccessMode != api.Restricted {
+		t.Fatalf("expected email access mode to remain restricted, got %s", updateServiceResp.Service.EmailAccessMode)
+	}
+	if len(updateServiceResp.Service.AllowedEmailAccountIds) != 1 || updateServiceResp.Service.AllowedEmailAccountIds[0] != "support" {
+		t.Fatalf("unexpected allowed accounts after update: %#v", updateServiceResp.Service.AllowedEmailAccountIds)
 	}
 
 	beforeReroll := updateServiceResp.Service.PublicKey
@@ -260,9 +275,19 @@ func TestPublicSendEndpoints_UseSignedAuthAndFakeSenders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey() failed: %v", err)
 	}
-	cfg := config.Get()
-	cfg.Services[0].PublicKey = string(ssh.MarshalAuthorizedKey(mustSSHPublicKey(t, pub)))
-	config.Set(cfg)
+	if err := store.UpdateConfig(func(cfg *config.Config) error {
+		for i := range cfg.Services {
+			if cfg.Services[i].ID != "billing-api" {
+				continue
+			}
+			cfg.Services[i].PublicKey = string(ssh.MarshalAuthorizedKey(mustSSHPublicKey(t, pub)))
+			cfg.Services[i].EmailAccessMode = "restricted"
+			cfg.Services[i].AllowedEmailAccountIDs = []string{"support"}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("UpdateConfig() failed: %v", err)
+	}
 
 	emailSender := &fakeEmailSender{}
 	smsSender := &fakeSmsSender{}
@@ -279,6 +304,15 @@ func TestPublicSendEndpoints_UseSignedAuthAndFakeSenders(t *testing.T) {
 	}
 	if emailSender.calls[0].From != "support@example.com" {
 		t.Fatalf("unexpected email sender: %s", emailSender.calls[0].From)
+	}
+
+	disallowedBody := []byte(`{"from":{"address":"receipts@example.com"},"subject":"Invoice ready","to":"finance@example.com","content":{"body":"Your invoice is ready for download.","isHtml":false}}`)
+	disallowedRec := doSignedRequest(t, router, "/v3/email", disallowedBody, "billing-api", priv)
+	if disallowedRec.Code != http.StatusForbidden {
+		t.Fatalf("expected forbidden email, got %d: %s", disallowedRec.Code, disallowedRec.Body.String())
+	}
+	if len(emailSender.calls) != 1 {
+		t.Fatalf("expected forbidden sender to be blocked before send, got %d calls", len(emailSender.calls))
 	}
 
 	smsBody := []byte(`{"senderName":"AlertOps","to":"+46700000000","content":{"body":"Incident"}}`)

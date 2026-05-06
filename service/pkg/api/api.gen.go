@@ -60,6 +60,12 @@ const (
 	Template AdminMessageContentMode = "template"
 )
 
+// Defines values for AdminServiceEmailAccessMode.
+const (
+	All        AdminServiceEmailAccessMode = "all"
+	Restricted AdminServiceEmailAccessMode = "restricted"
+)
+
 // Defines values for AdminServiceScope.
 const (
 	AdminServiceScopeAll   AdminServiceScope = "all"
@@ -257,27 +263,34 @@ type AdminMessageTemplate struct {
 
 // AdminService defines model for AdminService.
 type AdminService struct {
-	CreatedAt    *time.Time         `json:"createdAt,omitempty"`
-	Id           string             `json:"id"`
-	LastRerollAt *time.Time         `json:"lastRerollAt"`
-	Name         string             `json:"name"`
-	Notes        *string            `json:"notes,omitempty"`
-	Owner        *string            `json:"owner,omitempty"`
-	PublicKey    string             `json:"publicKey"`
-	Scope        AdminServiceScope  `json:"scope"`
-	Status       AdminServiceStatus `json:"status"`
+	AllowedEmailAccountIds []string                    `json:"allowedEmailAccountIds"`
+	CreatedAt              *time.Time                  `json:"createdAt,omitempty"`
+	EmailAccessMode        AdminServiceEmailAccessMode `json:"emailAccessMode"`
+	Id                     string                      `json:"id"`
+	LastRerollAt           *time.Time                  `json:"lastRerollAt"`
+	Name                   string                      `json:"name"`
+	Notes                  *string                     `json:"notes,omitempty"`
+	Owner                  *string                     `json:"owner,omitempty"`
+	PublicKey              string                      `json:"publicKey"`
+	Scope                  AdminServiceScope           `json:"scope"`
+	Status                 AdminServiceStatus          `json:"status"`
 }
 
 // AdminServiceCreateRequest defines model for AdminServiceCreateRequest.
 type AdminServiceCreateRequest struct {
-	Id        string             `json:"id"`
-	Name      string             `json:"name"`
-	Notes     *string            `json:"notes,omitempty"`
-	Owner     *string            `json:"owner,omitempty"`
-	PublicKey string             `json:"publicKey"`
-	Scope     AdminServiceScope  `json:"scope"`
-	Status    AdminServiceStatus `json:"status"`
+	AllowedEmailAccountIds *[]string                    `json:"allowedEmailAccountIds,omitempty"`
+	EmailAccessMode        *AdminServiceEmailAccessMode `json:"emailAccessMode,omitempty"`
+	Id                     string                       `json:"id"`
+	Name                   string                       `json:"name"`
+	Notes                  *string                      `json:"notes,omitempty"`
+	Owner                  *string                      `json:"owner,omitempty"`
+	PublicKey              string                       `json:"publicKey"`
+	Scope                  AdminServiceScope            `json:"scope"`
+	Status                 AdminServiceStatus           `json:"status"`
 }
+
+// AdminServiceEmailAccessMode defines model for AdminServiceEmailAccessMode.
+type AdminServiceEmailAccessMode string
 
 // AdminServiceListResponse defines model for AdminServiceListResponse.
 type AdminServiceListResponse struct {
@@ -307,12 +320,14 @@ type AdminServiceStatus string
 
 // AdminServiceUpdateRequest defines model for AdminServiceUpdateRequest.
 type AdminServiceUpdateRequest struct {
-	Name      *string             `json:"name,omitempty"`
-	Notes     *string             `json:"notes,omitempty"`
-	Owner     *string             `json:"owner,omitempty"`
-	PublicKey *string             `json:"publicKey,omitempty"`
-	Scope     *AdminServiceScope  `json:"scope,omitempty"`
-	Status    *AdminServiceStatus `json:"status,omitempty"`
+	AllowedEmailAccountIds *[]string                    `json:"allowedEmailAccountIds,omitempty"`
+	EmailAccessMode        *AdminServiceEmailAccessMode `json:"emailAccessMode,omitempty"`
+	Name                   *string                      `json:"name,omitempty"`
+	Notes                  *string                      `json:"notes,omitempty"`
+	Owner                  *string                      `json:"owner,omitempty"`
+	PublicKey              *string                      `json:"publicKey,omitempty"`
+	Scope                  *AdminServiceScope           `json:"scope,omitempty"`
+	Status                 *AdminServiceStatus          `json:"status,omitempty"`
 }
 
 // AdminSmsCredentials defines model for AdminSmsCredentials.

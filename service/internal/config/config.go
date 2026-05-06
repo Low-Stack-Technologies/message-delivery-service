@@ -26,15 +26,17 @@ type Config struct {
 }
 
 type ServiceConfig struct {
-	ID           string
-	Name         string
-	Owner        string
-	Scope        string
-	Status       string
-	PublicKey    string
-	Notes        string
-	CreatedAt    time.Time
-	LastRerollAt *time.Time
+	ID                     string
+	Name                   string
+	Owner                  string
+	Scope                  string
+	EmailAccessMode        string
+	AllowedEmailAccountIDs []string
+	Status                 string
+	PublicKey              string
+	Notes                  string
+	CreatedAt              time.Time
+	LastRerollAt           *time.Time
 }
 
 type EmailAccountConfig struct {

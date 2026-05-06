@@ -36,6 +36,7 @@ export type AdminUserCreateResponse = {
 }
 
 export type AdminServiceScope = 'all' | 'email' | 'sms'
+export type AdminServiceEmailAccessMode = 'all' | 'restricted'
 export type AdminServiceStatus = 'active' | 'paused'
 export type AdminEmailAccountStatus = 'healthy' | 'warning' | 'offline'
 export type AdminMessageChannel = 'email' | 'sms'
@@ -49,6 +50,8 @@ export type AdminService = {
   name: string
   owner: string
   scope: AdminServiceScope
+  emailAccessMode: AdminServiceEmailAccessMode
+  allowedEmailAccountIds: string[]
   status: AdminServiceStatus
   publicKey: string
   notes: string
@@ -61,6 +64,8 @@ export type AdminServiceCreateRequest = {
   name: string
   owner: string
   scope: AdminServiceScope
+  emailAccessMode: AdminServiceEmailAccessMode
+  allowedEmailAccountIds: string[]
   status: AdminServiceStatus
   publicKey: string
   notes: string
@@ -68,7 +73,7 @@ export type AdminServiceCreateRequest = {
 
 export type AdminServiceUpdateRequest = Partial<Pick<
   AdminService,
-  'name' | 'owner' | 'scope' | 'status' | 'publicKey' | 'notes'
+  'name' | 'owner' | 'scope' | 'emailAccessMode' | 'allowedEmailAccountIds' | 'status' | 'publicKey' | 'notes'
 >>
 
 export type AdminServiceListResponse = {

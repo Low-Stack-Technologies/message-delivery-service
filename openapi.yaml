@@ -229,6 +229,9 @@ components:
     AdminServiceScope:
       type: string
       enum: [all, email, sms]
+    AdminServiceEmailAccessMode:
+      type: string
+      enum: [all, restricted]
     AdminServiceStatus:
       type: string
       enum: [active, paused]
@@ -247,7 +250,7 @@ components:
 
     AdminService:
       type: object
-      required: [id, name, scope, status, publicKey]
+      required: [id, name, scope, emailAccessMode, allowedEmailAccountIds, status, publicKey]
       properties:
         id:
           type: string
@@ -260,6 +263,12 @@ components:
           example: Core Platform
         scope:
           $ref: '#/components/schemas/AdminServiceScope'
+        emailAccessMode:
+          $ref: '#/components/schemas/AdminServiceEmailAccessMode'
+        allowedEmailAccountIds:
+          type: array
+          items:
+            type: string
         status:
           $ref: '#/components/schemas/AdminServiceStatus'
         publicKey:
@@ -287,6 +296,12 @@ components:
           type: string
         scope:
           $ref: '#/components/schemas/AdminServiceScope'
+        emailAccessMode:
+          $ref: '#/components/schemas/AdminServiceEmailAccessMode'
+        allowedEmailAccountIds:
+          type: array
+          items:
+            type: string
         status:
           $ref: '#/components/schemas/AdminServiceStatus'
         publicKey:
@@ -302,6 +317,12 @@ components:
           type: string
         scope:
           $ref: '#/components/schemas/AdminServiceScope'
+        emailAccessMode:
+          $ref: '#/components/schemas/AdminServiceEmailAccessMode'
+        allowedEmailAccountIds:
+          type: array
+          items:
+            type: string
         status:
           $ref: '#/components/schemas/AdminServiceStatus'
         publicKey:

@@ -18,6 +18,7 @@ import {
   useAdminStore,
   type ActivityTone,
   type EmailAccountRecord,
+  type ServiceEmailAccessMode,
   type ServiceScope,
   type ServiceStatus,
 } from './admin-store'
@@ -70,6 +71,34 @@ function toneClass(tone: BadgeTone) {
 
 function getDefaultEmailAccount(accounts: EmailAccountRecord[]) {
   return accounts.find((account) => account.isDefault) ?? accounts[0] ?? null
+}
+
+function getAllowedEmailAccounts(
+  service: { emailAccessMode: ServiceEmailAccessMode; allowedEmailAccountIds: string[] },
+  accounts: EmailAccountRecord[],
+) {
+  if (service.emailAccessMode === 'all') {
+    return accounts
+  }
+
+  const allowed = new Set(service.allowedEmailAccountIds ?? [])
+  return accounts.filter((account) => allowed.has(account.id))
+}
+
+function getEmailAccessSummary(
+  service: { emailAccessMode: ServiceEmailAccessMode; allowedEmailAccountIds: string[] },
+  accounts: EmailAccountRecord[],
+) {
+  if (service.emailAccessMode === 'all') {
+    return 'All accounts'
+  }
+
+  const allowed = getAllowedEmailAccounts(service, accounts)
+  if (allowed.length === 0) {
+    return 'No accounts selected'
+  }
+
+  return allowed.map((account) => account.address).join(', ')
 }
 
 export function AdminShell() {
@@ -707,6 +736,8 @@ export function ServicesPage() {
   const [name, setName] = useState('')
   const [owner, setOwner] = useState('Platform Team')
   const [scope, setScope] = useState<ServiceScope>('all')
+  const [emailAccessMode, setEmailAccessMode] = useState<ServiceEmailAccessMode>('all')
+  const [allowedEmailAccountIds, setAllowedEmailAccountIds] = useState<string[]>([])
   const [status, setStatus] = useState<ServiceStatus>('active')
   const [notes, setNotes] = useState('')
   const [publicKey, setPublicKey] = useState('')
@@ -718,13 +749,17 @@ export function ServicesPage() {
           <p className="eyebrow">Services</p>
           <h1>Signed service access</h1>
           <p className="lede">
-            Add, delete, reroll keys, and update channel scope for each authorized service.
+            Add, delete, reroll keys, and update channel scope plus email-account access for each
+            authorized service.
           </p>
         </div>
       </header>
 
       <section className="split-grid">
-        <Panel title="Add service" description="Create a new signing client and assign its scope.">
+        <Panel
+          title="Add service"
+          description="Create a new signing client and assign its scope and email-account access."
+        >
           <form
             className="form-grid"
             onSubmit={(event) => {
@@ -745,6 +780,8 @@ export function ServicesPage() {
                   name: trimmedName,
                   owner: owner.trim() || 'Platform Team',
                   scope,
+                  emailAccessMode,
+                  allowedEmailAccountIds,
                   status,
                   publicKey: trimmedPublicKey,
                   notes: notes.trim(),
@@ -754,6 +791,8 @@ export function ServicesPage() {
               setName('')
               setOwner('Platform Team')
               setScope('all')
+              setEmailAccessMode('all')
+              setAllowedEmailAccountIds([])
               setStatus('active')
               setNotes('')
               setPublicKey('')
@@ -772,6 +811,46 @@ export function ServicesPage() {
                 <option value="sms">SMS only</option>
               </SelectInput>
             </Field>
+            <Field label="Email access" hint="Choose whether this service can use any sender or only specific SMTP accounts.">
+              <SelectInput
+                value={emailAccessMode}
+                onChange={(event) => setEmailAccessMode(event.target.value as ServiceEmailAccessMode)}
+              >
+                <option value="all">All email accounts</option>
+                <option value="restricted">Selected email accounts only</option>
+              </SelectInput>
+            </Field>
+            {emailAccessMode === 'restricted' ? (
+              <Field label="Allowed email accounts" hint="These SMTP accounts will be available to this service.">
+                <div className="choice-list">
+                  {state.emailAccounts.map((account) => {
+                    const checked = allowedEmailAccountIds.includes(account.id)
+                    return (
+                      <label key={account.id} className="choice-item">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => {
+                            setAllowedEmailAccountIds((current) =>
+                              event.target.checked
+                                ? Array.from(new Set([...current, account.id]))
+                                : current.filter((id) => id !== account.id),
+                            )
+                          }}
+                        />
+                        <span>
+                          <strong>{account.displayName}</strong>
+                          <small>{account.address}</small>
+                        </span>
+                      </label>
+                    )
+                  })}
+                  {state.emailAccounts.length === 0 ? (
+                    <p className="subtle">Create an email account first.</p>
+                  ) : null}
+                </div>
+              </Field>
+            ) : null}
             <Field label="Status">
               <SelectInput
                 value={status}
@@ -811,6 +890,7 @@ export function ServicesPage() {
                   <th>Service</th>
                   <th>Owner</th>
                   <th>Scope</th>
+                  <th>Email access</th>
                   <th>Status</th>
                   <th>Key</th>
                   <th>Actions</th>
@@ -837,7 +917,54 @@ export function ServicesPage() {
                         <option value="all">Email + SMS</option>
                         <option value="email">Email only</option>
                         <option value="sms">SMS only</option>
-                      </SelectInput>
+                        </SelectInput>
+                    </td>
+                    <td>
+                      <div className="stacked-cell">
+                        <SelectInput
+                          value={service.emailAccessMode}
+                          onChange={(event) =>
+                            dispatch({
+                              type: 'service/set-email-access',
+                              payload: {
+                                id: service.id,
+                                emailAccessMode: event.target.value as ServiceEmailAccessMode,
+                                allowedEmailAccountIds: service.allowedEmailAccountIds,
+                              },
+                            })
+                          }
+                          >
+                          <option value="all">All email accounts</option>
+                          <option value="restricted">Selected only</option>
+                        </SelectInput>
+                        {service.emailAccessMode === 'restricted' ? (
+                          <SelectInput
+                            multiple
+                            size={Math.max(3, Math.min(6, state.emailAccounts.length || 3))}
+                            value={service.allowedEmailAccountIds ?? []}
+                            onChange={(event) => {
+                              const ids = Array.from(event.currentTarget.selectedOptions).map(
+                                (option) => option.value,
+                              )
+                              dispatch({
+                                type: 'service/set-email-access',
+                                payload: {
+                                  id: service.id,
+                                  emailAccessMode: service.emailAccessMode,
+                                  allowedEmailAccountIds: ids,
+                                },
+                              })
+                            }}
+                          >
+                            {state.emailAccounts.map((account) => (
+                              <option key={account.id} value={account.id}>
+                                {account.displayName} ({account.address})
+                              </option>
+                            ))}
+                          </SelectInput>
+                        ) : null}
+                        <small className="subtle">{getEmailAccessSummary(service, state.emailAccounts)}</small>
+                      </div>
                     </td>
                     <td>
                       <Button
@@ -1272,6 +1399,14 @@ export function SendMessagePage() {
   } | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading'>('idle')
+  const selectedService = state.services.find((service) => service.id === serviceId) ?? null
+  const allowedEmailAccounts = selectedService
+    ? getAllowedEmailAccounts(selectedService, state.emailAccounts)
+    : state.emailAccounts
+  const allowedEmailAccountIds = selectedService?.allowedEmailAccountIds ?? []
+  const allowedEmailAccountsKey = `${selectedService?.emailAccessMode ?? 'all'}:${allowedEmailAccountIds.join('|')}:${state.emailAccounts
+    .map((account) => `${account.id}:${account.address}:${account.isDefault ? '1' : '0'}`)
+    .join('|')}`
 
   useEffect(() => {
     if (!state.services.some((service) => service.id === serviceId)) {
@@ -1284,11 +1419,15 @@ export function SendMessagePage() {
       return
     }
 
-    const defaultSender = getDefaultEmailAccount(state.emailAccounts)?.address ?? ''
-    if (!from && defaultSender) {
+    const defaultSender = getDefaultEmailAccount(allowedEmailAccounts)?.address ?? ''
+    if ((!from || !allowedEmailAccounts.some((account) => account.address === from)) && defaultSender) {
       setFrom(defaultSender)
+      return
     }
-  }, [channel, from, state.emailAccounts])
+    if (allowedEmailAccounts.length === 0 && from) {
+      setFrom('')
+    }
+  }, [allowedEmailAccountsKey, channel, from])
 
   const request = buildAdminMessageRequest({
     channel,
@@ -1371,6 +1510,10 @@ export function SendMessagePage() {
               if (recipientList.length === 0 || !serviceId) {
                 return
               }
+              if (channel === 'email' && allowedEmailAccounts.length === 0) {
+                setFeedback('This service has no allowed email accounts.')
+                return
+              }
 
               await createAdminMessage(token, {
                 ...request,
@@ -1426,15 +1569,25 @@ export function SendMessagePage() {
 
             {channel === 'email' ? (
               <>
-                <Field label="From address">
+                <Field
+                  label="From address"
+                  hint={
+                    selectedService?.emailAccessMode === 'restricted'
+                      ? 'Limited to allowed accounts for this service.'
+                      : 'Uses the default sender unless you override it.'
+                  }
+                >
                   <SelectInput value={from} onChange={(event) => setFrom(event.target.value)}>
-                    {state.emailAccounts.map((account) => (
+                    {allowedEmailAccounts.map((account) => (
                       <option key={account.id} value={account.address}>
                         {account.displayName} ({account.address})
                       </option>
                     ))}
                   </SelectInput>
                 </Field>
+                {allowedEmailAccounts.length === 0 ? (
+                  <p className="subtle">No allowed email accounts are available for this service.</p>
+                ) : null}
                 <Field label="Subject">
                   <TextInput value={subject} onChange={(event) => setSubject(event.target.value)} />
                 </Field>

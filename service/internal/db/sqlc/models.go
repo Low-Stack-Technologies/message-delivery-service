@@ -97,16 +97,23 @@ type MessageRecipient struct {
 }
 
 type Service struct {
-	ID           string     `json:"id"`
-	Name         string     `json:"name"`
-	Owner        string     `json:"owner"`
-	Scope        string     `json:"scope"`
-	Status       string     `json:"status"`
-	PublicKey    string     `json:"public_key"`
-	Notes        string     `json:"notes"`
-	CreatedAt    time.Time  `json:"created_at"`
-	LastRerollAt *time.Time `json:"last_reroll_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Owner           string     `json:"owner"`
+	Scope           string     `json:"scope"`
+	Status          string     `json:"status"`
+	PublicKey       string     `json:"public_key"`
+	Notes           string     `json:"notes"`
+	CreatedAt       time.Time  `json:"created_at"`
+	LastRerollAt    *time.Time `json:"last_reroll_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	EmailAccessMode string     `json:"email_access_mode"`
+}
+
+type ServiceEmailAccount struct {
+	ServiceID      string    `json:"service_id"`
+	EmailAccountID string    `json:"email_account_id"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type SmsCredential struct {
