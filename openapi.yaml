@@ -12,7 +12,7 @@ info:
        `Method + "\n" + Path + "\n" + X-Timestamp + "\n" + SHA256(Body)`
     2. Sign this string using your private key.
     3. Include the signature as a Base64-encoded string in the `Authorization` header.
-  version: 3.1.0
+  version: 3.2.0
 servers:
   - url: http://localhost:3000
     description: Local Development Environment
@@ -26,6 +26,11 @@ components:
       description: |
         Format: `Signature <base64_signature>`
         Required alongside `X-Client-Id` and `X-Timestamp`.
+    adminBearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Bearer token for admin-only browser operations.
 
   parameters:
     ClientIdHeader:
@@ -220,6 +225,547 @@ components:
                   type: string
                   example: "SEK"
 
+    # --- Admin ---
+    AdminServiceScope:
+      type: string
+      enum: [all, email, sms]
+    AdminServiceStatus:
+      type: string
+      enum: [active, paused]
+    AdminEmailAccountStatus:
+      type: string
+      enum: [healthy, warning, offline]
+    AdminActivityTone:
+      type: string
+      enum: [info, success, warning, danger]
+    AdminMessageChannel:
+      type: string
+      enum: [email, sms]
+    AdminMessageContentMode:
+      type: string
+      enum: [plain, html, template]
+
+    AdminService:
+      type: object
+      required: [id, name, scope, status, publicKey]
+      properties:
+        id:
+          type: string
+          example: billing-api
+        name:
+          type: string
+          example: Billing API
+        owner:
+          type: string
+          example: Core Platform
+        scope:
+          $ref: '#/components/schemas/AdminServiceScope'
+        status:
+          $ref: '#/components/schemas/AdminServiceStatus'
+        publicKey:
+          type: string
+          example: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBillingApiExampleKey
+        notes:
+          type: string
+          example: Primary transactional consumer for invoices and receipts.
+        createdAt:
+          type: string
+          format: date-time
+        lastRerollAt:
+          type: string
+          format: date-time
+          nullable: true
+    AdminServiceCreateRequest:
+      type: object
+      required: [id, name, scope, status, publicKey]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        owner:
+          type: string
+        scope:
+          $ref: '#/components/schemas/AdminServiceScope'
+        status:
+          $ref: '#/components/schemas/AdminServiceStatus'
+        publicKey:
+          type: string
+        notes:
+          type: string
+    AdminServiceUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        owner:
+          type: string
+        scope:
+          $ref: '#/components/schemas/AdminServiceScope'
+        status:
+          $ref: '#/components/schemas/AdminServiceStatus'
+        publicKey:
+          type: string
+        notes:
+          type: string
+    AdminServiceListResponse:
+      type: object
+      required: [success, services]
+      properties:
+        success:
+          type: boolean
+          example: true
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminService'
+    AdminServiceResponse:
+      type: object
+      required: [success, service]
+      properties:
+        success:
+          type: boolean
+          example: true
+        service:
+          $ref: '#/components/schemas/AdminService'
+    AdminServiceRerollResponse:
+      type: object
+      required: [success, service, privateKey]
+      properties:
+        success:
+          type: boolean
+          example: true
+        service:
+          $ref: '#/components/schemas/AdminService'
+        privateKey:
+          type: string
+          description: One-time secret returned when a keypair is rerolled.
+    AdminEmailSmtpConfig:
+      type: object
+      required: [host, port, username, password]
+      properties:
+        host:
+          type: string
+          example: smtp.example.com
+        port:
+          type: integer
+          example: 587
+        username:
+          type: string
+          example: support@example.com
+        password:
+          type: string
+          example: super-secret-password
+    AdminEmailAccount:
+      type: object
+      required: [id, address, smtp, status]
+      properties:
+        id:
+          type: string
+          example: support
+        address:
+          type: string
+          format: email
+          example: support@example.com
+        displayName:
+          type: string
+          example: Support Desk
+        smtp:
+          $ref: '#/components/schemas/AdminEmailSmtpConfig'
+        isDefault:
+          type: boolean
+          example: true
+        status:
+          $ref: '#/components/schemas/AdminEmailAccountStatus'
+        lastTestedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AdminEmailAccountCreateRequest:
+      type: object
+      required: [id, address, smtp]
+      properties:
+        id:
+          type: string
+        address:
+          type: string
+          format: email
+        displayName:
+          type: string
+        smtp:
+          $ref: '#/components/schemas/AdminEmailSmtpConfig'
+        isDefault:
+          type: boolean
+    AdminEmailAccountUpdateRequest:
+      type: object
+      properties:
+        address:
+          type: string
+          format: email
+        displayName:
+          type: string
+        smtp:
+          $ref: '#/components/schemas/AdminEmailSmtpConfig'
+        isDefault:
+          type: boolean
+    AdminEmailAccountListResponse:
+      type: object
+      required: [success, emailAccounts]
+      properties:
+        success:
+          type: boolean
+          example: true
+        emailAccounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminEmailAccount'
+    AdminEmailAccountResponse:
+      type: object
+      required: [success, emailAccount]
+      properties:
+        success:
+          type: boolean
+          example: true
+        emailAccount:
+          $ref: '#/components/schemas/AdminEmailAccount'
+    AdminEmailAccountTestResponse:
+      type: object
+      required: [success, emailAccount, testedAt]
+      properties:
+        success:
+          type: boolean
+          example: true
+        emailAccount:
+          $ref: '#/components/schemas/AdminEmailAccount'
+        testedAt:
+          type: string
+          format: date-time
+        message:
+          type: string
+          example: SMTP connection validated successfully.
+    AdminSmsCredentials:
+      type: object
+      required: [username, password, status, lastSyncedAt, rotationCount]
+      properties:
+        username:
+          type: string
+          example: api_user_id
+        password:
+          type: string
+          example: api_password
+        status:
+          type: string
+          enum: [connected, stale]
+        lastSyncedAt:
+          type: string
+          format: date-time
+        rotationCount:
+          type: integer
+          example: 2
+    AdminSmsCredentialsUpdateRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    AdminSmsCredentialsResponse:
+      type: object
+      required: [success, smsCredentials]
+      properties:
+        success:
+          type: boolean
+          example: true
+        smsCredentials:
+          $ref: '#/components/schemas/AdminSmsCredentials'
+    AdminSmsCredentialsRotateResponse:
+      type: object
+      required: [success, smsCredentials]
+      properties:
+        success:
+          type: boolean
+          example: true
+        smsCredentials:
+          $ref: '#/components/schemas/AdminSmsCredentials'
+    AdminMessageTemplate:
+      type: object
+      required: [name, data]
+      properties:
+        name:
+          type: string
+          example: welcome-email
+        data:
+          type: object
+          additionalProperties: true
+          example:
+            name: John
+    AdminMessageRequest:
+      type: object
+      required: [channel, serviceId, recipients, contentMode]
+      properties:
+        channel:
+          $ref: '#/components/schemas/AdminMessageChannel'
+        serviceId:
+          type: string
+          example: billing-api
+        recipients:
+          type: array
+          items:
+            type: string
+          example: ["one@example.com", "two@example.com"]
+        from:
+          type: string
+          format: email
+          example: support@example.com
+        senderName:
+          type: string
+          example: MyService
+        subject:
+          type: string
+          example: Welcome to our Service
+        contentMode:
+          $ref: '#/components/schemas/AdminMessageContentMode'
+        body:
+          type: string
+          example: Hello, this is a plain text message.
+        template:
+          $ref: '#/components/schemas/AdminMessageTemplate'
+    AdminMessage:
+      type: object
+      required: [id, channel, serviceId, recipients, sender, contentMode, createdAt, status]
+      properties:
+        id:
+          type: string
+          example: msg-1001
+        channel:
+          $ref: '#/components/schemas/AdminMessageChannel'
+        serviceId:
+          type: string
+          example: billing-api
+        recipients:
+          type: array
+          items:
+            type: string
+        sender:
+          type: string
+          example: support@example.com
+        subject:
+          type: string
+          nullable: true
+        contentMode:
+          $ref: '#/components/schemas/AdminMessageContentMode'
+        body:
+          type: string
+          nullable: true
+        templateName:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [queued, accepted]
+    AdminMessageListResponse:
+      type: object
+      required: [success, messages]
+      properties:
+        success:
+          type: boolean
+          example: true
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminMessage'
+    AdminMessageSubmitResponse:
+      type: object
+      required: [success, message, queuedMessage]
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Message queued successfully.
+        queuedMessage:
+          $ref: '#/components/schemas/AdminMessage'
+    AdminMessagePreviewResponse:
+      type: object
+      required: [success, preview]
+      properties:
+        success:
+          type: boolean
+          example: true
+        preview:
+          type: object
+          required: [request, rendered]
+          properties:
+            request:
+              $ref: '#/components/schemas/AdminMessageRequest'
+            rendered:
+              type: string
+              example: Preview of the delivery payload.
+            warnings:
+              type: array
+              items:
+                type: string
+    AdminActivity:
+      type: object
+      required: [id, title, detail, tone, createdAt]
+      properties:
+        id:
+          type: string
+          example: activity-1
+        title:
+          type: string
+          example: Service key rotated
+        detail:
+          type: string
+          example: Billing API generated a new signing key.
+        tone:
+          $ref: '#/components/schemas/AdminActivityTone'
+        createdAt:
+          type: string
+          format: date-time
+    AdminDashboardResponse:
+      type: object
+      required: [success, summary, recentActivity, recentMessages]
+      properties:
+        success:
+          type: boolean
+          example: true
+        summary:
+          type: object
+          required: [services, activeServices, emailAccounts, defaultEmailAccount, smsStatus, queuedMessages]
+          properties:
+            services:
+              type: integer
+              example: 3
+            activeServices:
+              type: integer
+              example: 2
+            emailAccounts:
+              type: integer
+              example: 2
+            defaultEmailAccount:
+              type: string
+              nullable: true
+              example: support@example.com
+            smsStatus:
+              type: string
+              enum: [connected, stale]
+            queuedMessages:
+              type: integer
+              example: 2
+        recentActivity:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminActivity'
+        recentMessages:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminMessage'
+    AdminUser:
+      type: object
+      required: [id, username, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          example: admin-1
+        username:
+          type: string
+          example: admin
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+    AdminUserCredentials:
+      type: object
+      required: [password, totpSecret, provisioningUri]
+      properties:
+        password:
+          type: string
+          example: 2gW7B...
+        totpSecret:
+          type: string
+          example: JBSWY3DPEHPK3PXP
+        provisioningUri:
+          type: string
+          example: otpauth://totp/Message%20Delivery%20Service:admin?secret=JBSWY3DPEHPK3PXP
+    AdminUserCreateRequest:
+      type: object
+      required: [username]
+      properties:
+        username:
+          type: string
+          example: admin
+    AdminUserCreateResponse:
+      type: object
+      required: [success, user, credentials]
+      properties:
+        success:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/AdminUser'
+        credentials:
+          $ref: '#/components/schemas/AdminUserCredentials'
+    AdminUserListResponse:
+      type: object
+      required: [success, users]
+      properties:
+        success:
+          type: boolean
+          example: true
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+    AdminLoginRequest:
+      type: object
+      required: [username, password, totpCode]
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          example: correct-horse-battery-staple
+        totpCode:
+          type: string
+          example: "123456"
+    AdminLoginResponse:
+      type: object
+      required: [success, token, expiresAt, user]
+      properties:
+        success:
+          type: boolean
+          example: true
+        token:
+          type: string
+          example: eyJhbGciOi...
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/AdminUser'
+    AdminMeResponse:
+      type: object
+      required: [success, user]
+      properties:
+        success:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/AdminUser'
+
 security:
   - signatureAuth: []
 
@@ -305,6 +851,677 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SmsSuccessResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/dashboard:
+    get:
+      summary: Admin dashboard summary
+      tags:
+        - Admin
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Dashboard snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboardResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/auth/login:
+    post:
+      summary: Log in to the admin console
+      tags:
+        - Admin
+      operationId: adminLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminLoginRequest'
+      responses:
+        '200':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminLoginResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/auth/me:
+    get:
+      summary: Inspect the current admin session
+      tags:
+        - Admin
+      operationId: getAdminAuthMe
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Current session user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMeResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/users:
+    get:
+      summary: List admin users
+      tags:
+        - Admin
+      operationId: getAdminUsers
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Admin users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create an admin user
+      tags:
+        - Admin
+      operationId: createAdminUser
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserCreateRequest'
+      responses:
+        '201':
+          description: Admin user created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserCreateResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/services:
+    get:
+      summary: List services with API access
+      tags:
+        - Admin
+      operationId: getAdminServices
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Registered services
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminServiceListResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create a service identity
+      tags:
+        - Admin
+      operationId: createAdminService
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminServiceCreateRequest'
+      responses:
+        '201':
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminServiceResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/services/{serviceId}:
+    parameters:
+      - name: serviceId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get a service identity
+      tags:
+        - Admin
+      operationId: getAdminService
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Service details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminServiceResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update a service identity
+      tags:
+        - Admin
+      operationId: updateAdminService
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminServiceUpdateRequest'
+      responses:
+        '200':
+          description: Service updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminServiceResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete a service identity
+      tags:
+        - Admin
+      operationId: deleteAdminService
+      security:
+        - adminBearerAuth: []
+      responses:
+        '204':
+          description: Service deleted
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/services/{serviceId}/reroll:
+    post:
+      summary: Reroll a service keypair
+      tags:
+        - Admin
+      operationId: rerollAdminService
+      security:
+        - adminBearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Service keypair rerolled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminServiceRerollResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/email-accounts:
+    get:
+      summary: List SMTP accounts
+      tags:
+        - Admin
+      operationId: getAdminEmailAccounts
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Registered email accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminEmailAccountListResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Create an SMTP account
+      tags:
+        - Admin
+      operationId: createAdminEmailAccount
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminEmailAccountCreateRequest'
+      responses:
+        '201':
+          description: Email account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminEmailAccountResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/email-accounts/{accountId}:
+    parameters:
+      - name: accountId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Get an SMTP account
+      tags:
+        - Admin
+      operationId: getAdminEmailAccount
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: SMTP account details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminEmailAccountResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update an SMTP account
+      tags:
+        - Admin
+      operationId: updateAdminEmailAccount
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminEmailAccountUpdateRequest'
+      responses:
+        '200':
+          description: SMTP account updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminEmailAccountResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete an SMTP account
+      tags:
+        - Admin
+      operationId: deleteAdminEmailAccount
+      security:
+        - adminBearerAuth: []
+      responses:
+        '204':
+          description: Email account deleted
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/email-accounts/{accountId}/test:
+    post:
+      summary: Test an SMTP account
+      tags:
+        - Admin
+      operationId: testAdminEmailAccount
+      security:
+        - adminBearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: SMTP test result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminEmailAccountTestResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/sms-credentials:
+    get:
+      summary: Get 46elks credentials
+      tags:
+        - Admin
+      operationId: getAdminSmsCredentials
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Current 46elks credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSmsCredentialsResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Update 46elks credentials
+      tags:
+        - Admin
+      operationId: updateAdminSmsCredentials
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSmsCredentialsUpdateRequest'
+      responses:
+        '200':
+          description: Credentials updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSmsCredentialsResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/sms-credentials/rotate:
+    post:
+      summary: Rotate 46elks credentials
+      tags:
+        - Admin
+      operationId: rotateAdminSmsCredentials
+      security:
+        - adminBearerAuth: []
+      responses:
+        '200':
+          description: Credentials rotated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSmsCredentialsRotateResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/messages:
+    get:
+      summary: List delivery messages
+      tags:
+        - Admin
+      operationId: getAdminMessages
+      security:
+        - adminBearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: channel
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AdminMessageChannel'
+        - name: serviceId
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delivery history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMessageListResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      summary: Queue a delivery message
+      tags:
+        - Admin
+      operationId: createAdminMessage
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminMessageRequest'
+      responses:
+        '202':
+          description: Message accepted for delivery
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMessageSubmitResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v3/admin/messages/preview:
+    post:
+      summary: Preview a delivery message
+      tags:
+        - Admin
+      operationId: previewAdminMessage
+      security:
+        - adminBearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminMessageRequest'
+      responses:
+        '200':
+          description: Preview generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMessagePreviewResponse'
         '400':
           description: Invalid request
           content:

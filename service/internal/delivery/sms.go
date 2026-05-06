@@ -10,15 +10,23 @@ import (
 )
 
 type SmsProvider struct {
-	config config.FortySixElksConfig
+	cfg *config.Config
 }
 
 func NewSmsProvider(cfg *config.Config) *SmsProvider {
-	return &SmsProvider{config: cfg.Sms.FortySixElks}
+	return &SmsProvider{cfg: cfg}
 }
 
 func (p *SmsProvider) Send(from string, to []string, body string) error {
 	// 46elks implementation
+	cfg := config.Get()
+	if cfg == nil {
+		cfg = p.cfg
+	}
+	if cfg == nil {
+		return fmt.Errorf("configuration snapshot is not available")
+	}
+	creds := cfg.Sms.FortySixElks
 	apiURL := "https://api.46elks.com/a1/sms"
 
 	config.DebugLog("[DEBUG] SMS Delivery - Sending to %d recipients via 46elks", len(to))
@@ -34,7 +42,7 @@ func (p *SmsProvider) Send(from string, to []string, body string) error {
 			return err
 		}
 
-		req.SetBasicAuth(p.config.Username, p.config.Password)
+		req.SetBasicAuth(creds.Username, creds.Password)
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 		resp, err := http.DefaultClient.Do(req)

@@ -10,22 +10,44 @@ import (
 )
 
 type EmailProvider struct {
-	accounts map[string]config.EmailAccountConfig
+	cfg *config.Config
 }
 
 func NewEmailProvider(cfg *config.Config) *EmailProvider {
-	accounts := make(map[string]config.EmailAccountConfig)
-	for _, acc := range cfg.EmailAccounts {
-		accounts[acc.Address] = acc
-	}
-	return &EmailProvider{accounts: accounts}
+	return &EmailProvider{cfg: cfg}
 }
 
 func (p *EmailProvider) Send(from string, to []string, subject string, body string, isHTML bool) error {
-	acc, ok := p.accounts[from]
-	if !ok {
+	cfg := config.Get()
+	if cfg == nil {
+		cfg = p.cfg
+	}
+	if cfg == nil {
+		return fmt.Errorf("configuration snapshot is not available")
+	}
+	var acc *config.EmailAccountConfig
+	for i := range cfg.EmailAccounts {
+		if cfg.EmailAccounts[i].Address == from {
+			acc = &cfg.EmailAccounts[i]
+			break
+		}
+	}
+	if acc == nil {
+		for i := range cfg.EmailAccounts {
+			if cfg.EmailAccounts[i].IsDefault {
+				acc = &cfg.EmailAccounts[i]
+				break
+			}
+		}
+	}
+
+	if acc == nil {
 		config.DebugLog("[DEBUG] Email Delivery Failed - No account for: %s", from)
 		return fmt.Errorf("no SMTP account configured for sender: %s", from)
+	}
+
+	if from == "" {
+		from = acc.Address
 	}
 
 	config.DebugLog("[DEBUG] Email Delivery - Using SMTP account: %s (%s:%d)", acc.Address, acc.SMTP.Host, acc.SMTP.Port)
@@ -34,16 +56,7 @@ func (p *EmailProvider) Send(from string, to []string, subject string, body stri
 	if isHTML {
 		contentType = "text/html"
 	}
-
-	encodedSubject := mime.QEncoding.Encode("utf-8", subject)
-
-	msg := fmt.Sprintf("From: %s\r\n"+
-		"To: %s\r\n"+
-		"Subject: %s\r\n"+
-		"MIME-Version: 1.0\r\n"+
-		"Content-Type: %s; charset=\"UTF-8\"\r\n"+
-		"\r\n"+
-		"%s", from, to[0], encodedSubject, contentType, body)
+	msg := buildEmailMessage(from, to, subject, body, contentType)
 
 	auth := smtp.PlainAuth("", acc.SMTP.Username, acc.SMTP.Password, acc.SMTP.Host)
 	addr := fmt.Sprintf("%s:%d", acc.SMTP.Host, acc.SMTP.Port)
@@ -98,4 +111,15 @@ func (p *EmailProvider) Send(from string, to []string, subject string, body stri
 	}
 	config.DebugLog("[DEBUG] Email Delivery Success - Sent to %v", to)
 	return nil
+}
+
+func buildEmailMessage(from string, to []string, subject string, body string, contentType string) string {
+	encodedSubject := mime.QEncoding.Encode("utf-8", subject)
+	return fmt.Sprintf("From: %s\r\n"+
+		"To: %s\r\n"+
+		"Subject: %s\r\n"+
+		"MIME-Version: 1.0\r\n"+
+		"Content-Type: %s; charset=\"UTF-8\"\r\n"+
+		"\r\n"+
+		"%s", from, to[0], encodedSubject, contentType, body)
 }

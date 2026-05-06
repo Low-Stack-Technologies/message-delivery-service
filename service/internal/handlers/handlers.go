@@ -8,19 +8,29 @@ import (
 	"time"
 
 	"github.com/Low-Stack-Technologies/message-delivery-service/internal/config"
-	"github.com/Low-Stack-Technologies/message-delivery-service/internal/delivery"
+	"github.com/Low-Stack-Technologies/message-delivery-service/internal/state"
 	"github.com/Low-Stack-Technologies/message-delivery-service/pkg/api"
 )
 
-type Handler struct {
-	email *delivery.EmailProvider
-	sms   *delivery.SmsProvider
+type EmailSender interface {
+	Send(from string, to []string, subject string, body string, isHTML bool) error
 }
 
-func NewHandler(email *delivery.EmailProvider, sms *delivery.SmsProvider) *Handler {
+type SmsSender interface {
+	Send(from string, to []string, body string) error
+}
+
+type Handler struct {
+	email EmailSender
+	sms   SmsSender
+	store *state.Store
+}
+
+func NewHandler(email EmailSender, sms SmsSender, store *state.Store) *Handler {
 	return &Handler{
 		email: email,
 		sms:   sms,
+		store: store,
 	}
 }
 

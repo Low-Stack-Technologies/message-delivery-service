@@ -2,64 +2,49 @@
 
 The core backend service for orchestrating email and SMS delivery. It handles request authentication, provider selection, and delivery tracking.
 
-## Deployment with Docker Compose
+## Deployment
 
-The service is available as a Docker image on `ghcr.io`.
+The service persists all runtime configuration in SQLite.
 
-### 1. Create a `docker-compose.yaml`
+### Runtime settings
+
+- `MDS_DB_PATH` sets the SQLite file path. If omitted, the service uses `message-delivery-service.db` in the working directory.
+- `--reset-db` removes the database file, recreates the schema, and exits.
+- `--seed-db` removes the database file, recreates the schema, seeds the demo dataset, and exits.
+
+### Default admin user
+
+On first start the service creates a default admin user and logs the username, password, and TOTP provisioning details to stdout. That is the bootstrap credential for the admin web UI.
+
+### Data model
+
+The database stores:
+
+- signed service identities
+- SMTP accounts
+- 46elks credentials
+- outbound message history
+- admin users and sessions
+- activity log entries
+
+### Docker Compose
+
+If you run the service in Docker, mount the SQLite file or a data directory:
+
 ```yaml
 services:
   mds:
     image: ghcr.io/low-stack-technologies/message-delivery-service:latest
     ports:
       - "3000:3000"
+    environment:
+      - MDS_DB_PATH=/data/message-delivery-service.db
     volumes:
-      - ./config.yaml:/app/config.yaml
+      - ./data:/data
     restart: unless-stopped
-```
-
-### 2. Initialize Configuration
-Create a `config.yaml` file in the same directory. The service will generate a default one if it's missing, but you should configure your providers and authorized services.
-
-## Configuration Guide
-
-The `config.yaml` file is the central source of truth and supports **hot-reloading**.
-
-### 1. General Settings
-```yaml
-debug: false # Set to true to enable verbose tracing in server logs
-```
-
-### 2. Authorized Services (Signature Auth)
-Every client using the API must be registered here with their Ed25519 public key.
-```yaml
-services:
-  - id: "my-app"
-    name: "My Application"
-    public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA..." # OpenSSH or PKCS8 Base64
-```
-
-### 2. Email Configuration (SMTP)
-You can add multiple SMTP accounts. The service selects the account based on the `from` address in the API request.
-```yaml
-email_accounts:
-  - address: "support@example.com"
-    smtp:
-      host: "smtp.example.com"
-      port: 465 # Supports 465 (Implicit SSL/TLS) and 587 (STARTTLS)
-      username: "user@example.com"
-      password: "your-password"
-```
-
-### 3. SMS Configuration (46elks)
-```yaml
-sms:
-  46elks:
-    username: "api_user_id"
-    password: "api_password"
 ```
 
 ## Monitoring
 
 - **Health Check**: `GET /health` (Public) - Returns 200 OK if the service is running.
-- **Logs**: The service logs all authentication attempts and delivery statuses with `[DEBUG]` prefixes for easy troubleshooting.
+- **Logs**: The service logs default admin bootstrap credentials and delivery/authentication activity with `[DEBUG]` prefixes for troubleshooting.

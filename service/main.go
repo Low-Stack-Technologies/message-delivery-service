@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -14,30 +16,62 @@ import (
 	"github.com/Low-Stack-Technologies/message-delivery-service/internal/config"
 	"github.com/Low-Stack-Technologies/message-delivery-service/internal/delivery"
 	"github.com/Low-Stack-Technologies/message-delivery-service/internal/handlers"
+	"github.com/Low-Stack-Technologies/message-delivery-service/internal/state"
 	"github.com/Low-Stack-Technologies/message-delivery-service/pkg/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
-	// 1. Load Config
-	cfgPath := "config.yaml"
-	cfg, err := config.Load(cfgPath)
+	resetDB := flag.Bool("reset-db", false, "reset the SQLite database and exit")
+	seedDB := flag.Bool("seed-db", false, "reset and seed the SQLite database, then exit")
+	flag.Parse()
+
+	// 1. Open Database
+	dbPath := os.Getenv("MDS_DB_PATH")
+	if dbPath == "" {
+		dbPath = "message-delivery-service.db"
+	}
+
+	if *resetDB || *seedDB {
+		if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
+			log.Fatalf("Failed to remove database file: %v", err)
+		}
+		if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+			log.Fatalf("Failed to prepare database directory: %v", err)
+		}
+		store, err := state.New(dbPath)
+		if err != nil {
+			log.Fatalf("Failed to initialize state store: %v", err)
+		}
+		if err := store.Close(); err != nil {
+			log.Printf("Warning: failed to close database: %v", err)
+		}
+		log.Printf("Database initialized at %s", dbPath)
+		return
+	}
+
+	store, err := state.New(dbPath)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("Failed to initialize state store: %v", err)
+	}
+	defer func() {
+		if err := store.Close(); err != nil {
+			log.Printf("Warning: failed to close database: %v", err)
+		}
+	}()
+
+	cfg := config.Get()
+	if cfg == nil {
+		log.Fatal("configuration snapshot is not available")
 	}
 
-	// 2. Start Hot-Reload
-	if err := config.Watch(cfgPath); err != nil {
-		log.Printf("Warning: Failed to start config watcher: %v", err)
-	}
-
-	// 3. Initialize Backends
+	// 2. Initialize Backends
 	emailProvider := delivery.NewEmailProvider(cfg)
 	smsProvider := delivery.NewSmsProvider(cfg)
-	h := handlers.NewHandler(emailProvider, smsProvider)
+	h := handlers.NewHandler(emailProvider, smsProvider, store)
 
-	// 4. Setup Router
+	// 3. Setup Router
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -47,13 +81,13 @@ func main() {
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(auth.NewMiddleware())
+		r.Use(auth.NewMiddleware(store))
 		api.HandlerWithOptions(h, api.ChiServerOptions{
 			BaseRouter: r,
 		})
 	})
 
-	// 5. Start Server
+	// 4. Start Server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
 		Addr:    addr,

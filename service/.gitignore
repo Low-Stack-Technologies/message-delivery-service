@@ -1,2 +1,4 @@
 tmp
-config.yaml
+message-delivery-service.db
+message-delivery-service.db-shm
+message-delivery-service.db-wal
