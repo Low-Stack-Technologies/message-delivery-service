@@ -7,7 +7,13 @@ import type {
   TextareaHTMLAttributes,
 } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router'
-import { createAdminUser, listAdminUsers } from './admin-api'
+import {
+  createAdminMessage,
+  createAdminUser,
+  listAdminUsers,
+  previewAdminMessage,
+  type AdminMessageRequest,
+} from './admin-api'
 import {
   useAdminStore,
   type ActivityTone,
@@ -75,6 +81,7 @@ export function AdminShell() {
   }
 
   const activeServices = state.services.filter((service) => service.status === 'active')
+  const queuedMessages = state.messages.filter((message) => message.status === 'queued').length
   const defaultEmail = getDefaultEmailAccount(state.emailAccounts)
   const latestActivity = state.activity[0]
 
@@ -142,8 +149,8 @@ export function AdminShell() {
         </nav>
 
         <section className="sidebar-card">
-          <p className="eyebrow">Local state</p>
-          <strong>{state.messages.length} queued messages</strong>
+          <p className="eyebrow">Live state</p>
+          <strong>{queuedMessages} queued messages</strong>
           <span>
             {activeServices.length} active services ·{' '}
             {state.emailAccounts.length} SMTP accounts
@@ -166,7 +173,7 @@ export function AdminShell() {
             <h2>Manage services, providers, and outbound delivery.</h2>
           </div>
         <div className="topbar-meta">
-          <span className="pill">Mocked admin data</span>
+          <span className="pill">Live admin data</span>
           <span className="pill pill-muted">
             {user ? `Signed in as ${user.username}` : 'Not signed in'}
           </span>
@@ -542,6 +549,7 @@ export function OverviewPage() {
   const activeServices = state.services.filter((service) => service.status === 'active')
   const defaultEmail = getDefaultEmailAccount(state.emailAccounts)
   const connectedSms = state.smsCredentials.status === 'connected'
+  const queuedMessages = state.messages.filter((message) => message.status === 'queued').length
 
   return (
     <div className="page">
@@ -589,8 +597,8 @@ export function OverviewPage() {
         />
         <MetricCard
           label="Queued messages"
-          value={state.messages.length}
-          detail="Local mock queue, ready for the real API later."
+          value={queuedMessages}
+          detail="Queued messages from the backend."
           tone="neutral"
         />
       </section>
@@ -625,7 +633,7 @@ export function OverviewPage() {
 
         <Panel
           title="Recent activity"
-          description="A simple audit trail for local UI actions."
+          description="Recent audit events from the backend."
           action={
             <Link className="text-link" to="/email-accounts">
               Inspect providers
@@ -649,7 +657,7 @@ export function OverviewPage() {
 
       <Panel
         title="Recent sends"
-        description="The last deliveries queued through the mock UI."
+        description="The latest deliveries queued through the backend."
         action={
           <Link className="text-link" to="/send-message">
             Compose new message
@@ -701,7 +709,7 @@ export function ServicesPage() {
   const [scope, setScope] = useState<ServiceScope>('all')
   const [status, setStatus] = useState<ServiceStatus>('active')
   const [notes, setNotes] = useState('')
-  const [publicKey, setPublicKey] = useState('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...')
+  const [publicKey, setPublicKey] = useState('')
 
   return (
     <div className="page">
@@ -723,7 +731,8 @@ export function ServicesPage() {
               event.preventDefault()
 
               const trimmedName = name.trim()
-              if (!trimmedName) {
+              const trimmedPublicKey = publicKey.trim()
+              if (!trimmedName || !trimmedPublicKey) {
                 return
               }
 
@@ -737,7 +746,7 @@ export function ServicesPage() {
                   owner: owner.trim() || 'Platform Team',
                   scope,
                   status,
-                  publicKey: publicKey.trim(),
+                  publicKey: trimmedPublicKey,
                   notes: notes.trim(),
                 },
               })
@@ -747,7 +756,7 @@ export function ServicesPage() {
               setScope('all')
               setStatus('active')
               setNotes('')
-              setPublicKey('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...')
+              setPublicKey('')
             }}
           >
             <Field label="Service name">
@@ -777,6 +786,7 @@ export function ServicesPage() {
                 rows={4}
                 value={publicKey}
                 onChange={(event) => setPublicKey(event.target.value)}
+                placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA..."
               />
             </Field>
             <Field label="Notes">
@@ -920,7 +930,8 @@ export function EmailAccountsPage() {
               event.preventDefault()
 
               const trimmedAddress = address.trim()
-              if (!trimmedAddress) {
+              const trimmedPassword = password.trim()
+              if (!trimmedAddress || !trimmedPassword) {
                 return
               }
 
@@ -935,7 +946,7 @@ export function EmailAccountsPage() {
                   smtpHost: smtpHost.trim(),
                   smtpPort: Number(smtpPort) || 587,
                   username: username.trim() || trimmedAddress,
-                  password: password.trim() || '••••••••••••',
+                  password: trimmedPassword,
                 },
               })
 
@@ -974,6 +985,7 @@ export function EmailAccountsPage() {
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter SMTP password"
               />
             </Field>
             <div className="form-actions">
@@ -1072,6 +1084,11 @@ export function FortySixElksPage() {
   const [password, setPassword] = useState(state.smsCredentials.password)
   const [showPassword, setShowPassword] = useState(false)
 
+  useEffect(() => {
+    setUsername(state.smsCredentials.username)
+    setPassword(state.smsCredentials.password)
+  }, [state.smsCredentials.password, state.smsCredentials.username])
+
   return (
     <div className="page">
       <header className="page-header">
@@ -1085,17 +1102,23 @@ export function FortySixElksPage() {
       </header>
 
       <section className="split-grid">
-        <Panel title="Credential editor" description="Update the local mock secret pair.">
+        <Panel title="Credential editor" description="Update the 46elks credential pair.">
           <form
             className="form-grid"
             onSubmit={(event) => {
               event.preventDefault()
 
+              const trimmedUsername = username.trim()
+              const trimmedPassword = password.trim()
+              if (!trimmedUsername || !trimmedPassword) {
+                return
+              }
+
               dispatch({
                 type: 'sms/update',
                 payload: {
-                  username: username.trim(),
-                  password: password.trim() || '••••••••••••',
+                  username: trimmedUsername,
+                  password: trimmedPassword,
                 },
               })
             }}
@@ -1129,7 +1152,7 @@ export function FortySixElksPage() {
         </Panel>
 
         <div className="stack">
-          <Panel title="Connection status" description="Current mock health for the SMS provider.">
+          <Panel title="Connection status" description="Current health for the SMS provider.">
             <div className="card-grid">
               <div>
                 <p className="field-label">Provider</p>
@@ -1175,7 +1198,7 @@ export function FortySixElksPage() {
   )
 }
 
-function buildPreviewPayload({
+function buildAdminMessageRequest({
   channel,
   serviceId,
   recipients,
@@ -1197,64 +1220,41 @@ function buildPreviewPayload({
   body: string
   templateName: string
   templateData: string
-}) {
-  let parsedTemplate: unknown = {}
-
-  if (templateData.trim()) {
-    try {
-      parsedTemplate = JSON.parse(templateData)
-    } catch {
-      parsedTemplate = { raw: templateData }
-    }
-  }
-
-  if (channel === 'email') {
-    return {
-      to: recipients,
-      from,
-      subject,
-      content:
-        contentMode === 'template'
-          ? {
-              template: {
-                name: templateName,
-                data: parsedTemplate,
-              },
-            }
-          : {
-              body,
-              isHtml: contentMode === 'html',
-            },
-      meta: {
-        serviceId,
-        channel,
-      },
-    }
-  }
-
+}): AdminMessageRequest {
   return {
-    to: recipients,
-    senderName,
-    content:
+    channel,
+    serviceId,
+    recipients,
+    from: channel === 'email' ? from : undefined,
+    senderName: channel === 'sms' ? senderName : undefined,
+    subject: channel === 'email' ? subject : undefined,
+    contentMode,
+    body: contentMode === 'template' ? undefined : body,
+    template:
       contentMode === 'template'
         ? {
-            template: {
-              name: templateName,
-              data: parsedTemplate,
-            },
+            name: templateName,
+            data: parseJsonOrRaw(templateData),
           }
-        : {
-            body,
-          },
-    meta: {
-      serviceId,
-      channel,
-    },
+        : undefined,
+  }
+}
+
+function parseJsonOrRaw(value: string) {
+  if (!value.trim()) {
+    return {}
+  }
+
+  try {
+    return JSON.parse(value) as Record<string, unknown>
+  } catch {
+    return { raw: value }
   }
 }
 
 export function SendMessagePage() {
-  const { state, dispatch } = useAdminStore()
+  const { state, refresh } = useAdminStore()
+  const { token } = useAdminAuth()
   const [channel, setChannel] = useState<'email' | 'sms'>('email')
   const [serviceId, setServiceId] = useState(state.services[0]?.id ?? '')
   const [recipients, setRecipients] = useState('')
@@ -1266,8 +1266,31 @@ export function SendMessagePage() {
   const [templateData, setTemplateData] = useState('{\n  "name": "Alex"\n}')
   const [contentMode, setContentMode] = useState<'plain' | 'html' | 'template'>('plain')
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [preview, setPreview] = useState<{
+    rendered: string
+    warnings?: string[]
+  } | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [previewStatus, setPreviewStatus] = useState<'idle' | 'loading'>('idle')
 
-  const preview = buildPreviewPayload({
+  useEffect(() => {
+    if (!state.services.some((service) => service.id === serviceId)) {
+      setServiceId(state.services[0]?.id ?? '')
+    }
+  }, [serviceId, state.services])
+
+  useEffect(() => {
+    if (channel !== 'email') {
+      return
+    }
+
+    const defaultSender = getDefaultEmailAccount(state.emailAccounts)?.address ?? ''
+    if (!from && defaultSender) {
+      setFrom(defaultSender)
+    }
+  }, [channel, from, state.emailAccounts])
+
+  const request = buildAdminMessageRequest({
     channel,
     serviceId,
     recipients: splitValues(recipients),
@@ -1280,6 +1303,48 @@ export function SendMessagePage() {
     templateData,
   })
 
+  const previewKey = JSON.stringify(request)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadPreview() {
+      if (!token || !serviceId || request.recipients.length === 0) {
+        if (!cancelled) {
+          setPreview(null)
+          setPreviewError(null)
+          setPreviewStatus('idle')
+        }
+        return
+      }
+
+      setPreviewStatus('loading')
+      try {
+        const response = await previewAdminMessage(token, request)
+        if (!cancelled) {
+          setPreview(response.preview)
+          setPreviewError(null)
+          setPreviewStatus('idle')
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setPreview(null)
+          setPreviewError(error instanceof Error ? error.message : 'Failed to preview message')
+          setPreviewStatus('idle')
+        }
+      }
+    }
+
+    const handle = window.setTimeout(() => {
+      void loadPreview()
+    }, 250)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
+    }
+  }, [previewKey, serviceId, token])
+
   return (
     <div className="page">
       <header className="page-header">
@@ -1287,7 +1352,7 @@ export function SendMessagePage() {
           <p className="eyebrow">Send message</p>
           <h1>Compose delivery requests</h1>
           <p className="lede">
-            Build the request payload in the UI, inspect the preview, and queue a local send.
+            Build the request payload in the UI, inspect the backend preview, and queue a send.
           </p>
         </div>
       </header>
@@ -1296,27 +1361,24 @@ export function SendMessagePage() {
         <Panel title="Composer" description="Switch between email and SMS without leaving the page.">
           <form
             className="form-grid"
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault()
+              if (!token) {
+                return
+              }
 
               const recipientList = splitValues(recipients)
               if (recipientList.length === 0 || !serviceId) {
                 return
               }
 
-              dispatch({
-                type: 'message/send',
-                payload: {
-                  channel,
-                  serviceId,
-                  recipients: recipientList,
-                  sender: channel === 'email' ? from : senderName,
-                  subject: channel === 'email' ? subject.trim() || null : null,
-                  contentMode,
-                  body,
-                  templateName: contentMode === 'template' ? templateName.trim() || null : null,
-                },
+              await createAdminMessage(token, {
+                ...request,
+                recipients: recipientList,
+                serviceId,
+                body: request.body,
               })
+              await refresh()
 
               setFeedback(
                 `${channelLabels[channel]} message queued for ${recipientList.length} recipient(s).`,
@@ -1431,11 +1493,19 @@ export function SendMessagePage() {
         </Panel>
 
         <div className="stack">
-          <Panel title="Payload preview" description="This is what the backend request will resemble.">
-            <pre className="preview-code">{JSON.stringify(preview, null, 2)}</pre>
+          <Panel
+            title="Payload preview"
+            description={previewStatus === 'loading' ? 'Fetching backend preview...' : 'Backend-rendered payload preview.'}
+          >
+            {previewError ? <div className="feedback">{previewError}</div> : null}
+            {preview ? (
+              <pre className="preview-code">{JSON.stringify({ request, preview }, null, 2)}</pre>
+            ) : (
+              <pre className="preview-code">{JSON.stringify(request, null, 2)}</pre>
+            )}
           </Panel>
 
-          <Panel title="Recent messages" description="A local log of the latest queued deliveries.">
+          <Panel title="Recent messages" description="Recent deliveries from the backend.">
             <div className="stack">
               {state.messages.slice(0, 6).map((message) => (
                 <article key={message.id} className="message-row">
